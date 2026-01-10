@@ -312,3 +312,65 @@ export const lightX2VTask = async (
 
   return resultData.url;
 };
+
+/**
+ * LightX2V TTS Client Integration
+ */
+export const lightX2VTTS = async (
+  baseUrl: string,
+  token: string,
+  text: string,
+  voiceType: string,
+  options: any = {}
+): Promise<string> => {
+  if (!baseUrl || !baseUrl.trim()) throw new Error("Base URL is required for LightX2V TTS");
+  if (!token || !token.trim()) throw new Error("Access Token is required for LightX2V TTS");
+
+  const normalizedBaseUrl = baseUrl.replace(/\/$/, '');
+  const url = `${normalizedBaseUrl}/api/v1/tts/generate`;
+
+  const payload = {
+    text,
+    voice_type: voiceType,
+    context_texts: options.context_texts || "",
+    emotion: options.emotion || "",
+    emotion_scale: options.emotion_scale || 3,
+    speech_rate: options.speech_rate || 0,
+    pitch: options.pitch || 0,
+    loudness_rate: options.loudness_rate || 0,
+    resource_id: options.resource_id || "seed-tts-1.0"
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'audio/*, application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`LightX2V TTS Failed (${response.status}): ${errText}`);
+  }
+
+  const contentType = response.headers.get('Content-Type') || '';
+  if (contentType.includes('audio') || contentType.includes('octet-stream')) {
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        // We need just the base64 part for consistency with the rest of the app's audio handling
+        const base64 = (reader.result as string).split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } else {
+    const json = await response.json();
+    throw new Error(json.error || "Unknown TTS error");
+  }
+};
