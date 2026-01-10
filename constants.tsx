@@ -62,24 +62,9 @@ export const TOOLS: ToolDefinition[] = [
     outputs: [], // Dynamically managed via node.data.customOutputs
     icon: 'Cpu',
     models: [
+      { id: 'deepseek-v3-2-251201', name: 'DeepSeek V3.2' },
       { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro' },
       { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' }
-    ]
-  },
-  {
-    id: 'web-search',
-    name: 'Web Search',
-    name_zh: '联网搜索',
-    category: 'AI Model',
-    category_zh: 'AI 模型',
-    description: 'Search the web for real-time information grounding',
-    description_zh: '在互联网上搜索实时信息进行校对',
-    inputs: [{ id: 'in-text', type: DataType.TEXT, label: 'Search Query' }],
-    outputs: [{ id: 'out-text', type: DataType.TEXT, label: 'Search Results' }],
-    icon: 'Globe',
-    models: [
-      { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' },
-      { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro' }
     ]
   },
   {
@@ -118,22 +103,38 @@ export const TOOLS: ToolDefinition[] = [
     ]
   },
   {
-    id: 'gemini-tts',
+    id: 'tts',
     name: 'TTS (Speech)',
     name_zh: '语音合成 (TTS)',
     category: 'AI Model',
     category_zh: 'AI 模型',
-    description: 'Natural text-to-speech conversion with optional tone cues',
-    description_zh: '将文本转换为自然的人声语音',
+    description: 'Text-to-speech conversion using Gemini or LightX2V',
+    description_zh: '使用 Gemini 或 LightX2V 进行语音合成',
     inputs: [
       { id: 'in-text', type: DataType.TEXT, label: 'TTS Text' },
-      { id: 'in-tone', type: DataType.TEXT, label: 'Tone Instruction (Opt)' }
+      { id: 'in-context-tone', type: DataType.TEXT, label: 'Context & Tone (Opt)' }
     ],
     outputs: [{ id: 'out-audio', type: DataType.AUDIO, label: 'Audio' }],
     icon: 'Volume2',
     models: [
+      { id: 'lightx2v', name: 'LightX2V TTS' },
       { id: 'gemini-2.5-flash-preview-tts', name: 'Gemini 2.5 TTS' }
     ]
+  },
+  {
+    id: 'lightx2v-voice-clone',
+    name: 'LightX2V Voice Clone',
+    name_zh: 'LightX2V 音色克隆',
+    category: 'AI Model',
+    category_zh: 'AI 模型',
+    description: 'Clone voice from audio and generate TTS with cloned voice using LightX2V',
+    description_zh: '从音频克隆音色，并使用克隆的音色生成语音',
+    inputs: [
+      { id: 'in-tts-text', type: DataType.TEXT, label: 'TTS Text' }
+    ],
+    outputs: [{ id: 'out-audio', type: DataType.AUDIO, label: 'Audio' }],
+    icon: 'Mic',
+    models: []
   },
   {
     id: 'video-gen-text',
@@ -222,6 +223,7 @@ export const TOOLS: ToolDefinition[] = [
     outputs: [{ id: 'out-video', type: DataType.VIDEO, label: 'Swapped Video' }],
     icon: 'UserCog',
     models: [
+      { id: 'wan2.2_animate', name: 'Wan 2.2 Animate' },
       { id: 'veo-3.1-fast-generate-preview', name: 'Veo 3.1 Fast' }
     ]
   }

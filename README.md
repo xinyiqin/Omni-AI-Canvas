@@ -15,6 +15,10 @@ View your app in AI Studio: https://ai.studio/apps/drive/1t0hVygJXGiKbAXvfLiWnPt
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. Create a `.env.local` file in the root directory and set the following environment variables:
+   - `GEMINI_API_KEY`: Your Gemini API key
+   - `DEEPSEEK_API_KEY`: (Optional) Your DeepSeek API key for using DeepSeek V3.2 model
+   - `LIGHTX2V_TOKEN`: (Optional) Your LightX2V access token. If not set, you can configure it in the app's environment variables UI.
+   - `LIGHTX2V_URL`: (Optional) LightX2V API endpoint URL. Defaults to `https://x2v.light-ai.top` if not set.
 3. Run the app:
    `npm run dev`
