@@ -123,8 +123,8 @@ export const TOOLS: ToolDefinition[] = [
     name_zh: '语音合成 (TTS)',
     category: 'AI Model',
     category_zh: 'AI 模型',
-    description: 'Natural text-to-speech conversion using Gemini or LightX2V',
-    description_zh: '将文本转换为自然的人声语音 (可选 Gemini 或 LightX2V)',
+    description: 'Natural text-to-speech conversion with optional tone cues',
+    description_zh: '将文本转换为自然的人声语音',
     inputs: [
       { id: 'in-text', type: DataType.TEXT, label: 'TTS Text' },
       { id: 'in-tone', type: DataType.TEXT, label: 'Tone Instruction (Opt)' }
@@ -132,8 +132,7 @@ export const TOOLS: ToolDefinition[] = [
     outputs: [{ id: 'out-audio', type: DataType.AUDIO, label: 'Audio' }],
     icon: 'Volume2',
     models: [
-      { id: 'gemini-2.5-flash-preview-tts', name: 'Gemini 2.5 TTS' },
-      { id: 'lightx2v-seed-tts', name: 'LightX2V (Seed-TTS)' }
+      { id: 'gemini-2.5-flash-preview-tts', name: 'Gemini 2.5 TTS' }
     ]
   },
   {
