@@ -369,34 +369,25 @@ const PRESET_WORKFLOWS: WorkflowState[] = [
       { id: 'c25', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-9', targetPortId: 'in-image' },
       { id: 'c26', sourceNodeId: 'node-i2i-8', sourcePortId: 'out-image', targetNodeId: 'node-i2i-9', targetPortId: 'in-image' },
       { id: 'c27', sourceNodeId: 'node-planner', sourcePortId: 'scene9_prompt', targetNodeId: 'node-i2i-9', targetPortId: 'in-text' },
-      // Image to video generation (dual-frame: start frame + end frame)
-      { id: 'c28', sourceNodeId: 'node-i2i-1', sourcePortId: 'out-image', targetNodeId: 'node-video-1', targetPortId: 'in-image-start' },
-      { id: 'c29', sourceNodeId: 'node-i2i-2', sourcePortId: 'out-image', targetNodeId: 'node-video-1', targetPortId: 'in-image-end' },
-      { id: 'c30', sourceNodeId: 'node-planner', sourcePortId: 'scene1_video', targetNodeId: 'node-video-1', targetPortId: 'in-text' },
-      { id: 'c31', sourceNodeId: 'node-i2i-2', sourcePortId: 'out-image', targetNodeId: 'node-video-2', targetPortId: 'in-image-start' },
-      { id: 'c32', sourceNodeId: 'node-i2i-3', sourcePortId: 'out-image', targetNodeId: 'node-video-2', targetPortId: 'in-image-end' },
-      { id: 'c33', sourceNodeId: 'node-planner', sourcePortId: 'scene2_video', targetNodeId: 'node-video-2', targetPortId: 'in-text' },
-      { id: 'c34', sourceNodeId: 'node-i2i-3', sourcePortId: 'out-image', targetNodeId: 'node-video-3', targetPortId: 'in-image-start' },
-      { id: 'c35', sourceNodeId: 'node-i2i-4', sourcePortId: 'out-image', targetNodeId: 'node-video-3', targetPortId: 'in-image-end' },
-      { id: 'c36', sourceNodeId: 'node-planner', sourcePortId: 'scene3_video', targetNodeId: 'node-video-3', targetPortId: 'in-text' },
-      { id: 'c37', sourceNodeId: 'node-i2i-4', sourcePortId: 'out-image', targetNodeId: 'node-video-4', targetPortId: 'in-image-start' },
-      { id: 'c38', sourceNodeId: 'node-i2i-5', sourcePortId: 'out-image', targetNodeId: 'node-video-4', targetPortId: 'in-image-end' },
-      { id: 'c39', sourceNodeId: 'node-planner', sourcePortId: 'scene4_video', targetNodeId: 'node-video-4', targetPortId: 'in-text' },
-      { id: 'c40', sourceNodeId: 'node-i2i-5', sourcePortId: 'out-image', targetNodeId: 'node-video-5', targetPortId: 'in-image-start' },
-      { id: 'c41', sourceNodeId: 'node-i2i-6', sourcePortId: 'out-image', targetNodeId: 'node-video-5', targetPortId: 'in-image-end' },
-      { id: 'c42', sourceNodeId: 'node-planner', sourcePortId: 'scene5_video', targetNodeId: 'node-video-5', targetPortId: 'in-text' },
-      { id: 'c43', sourceNodeId: 'node-i2i-6', sourcePortId: 'out-image', targetNodeId: 'node-video-6', targetPortId: 'in-image-start' },
-      { id: 'c44', sourceNodeId: 'node-i2i-7', sourcePortId: 'out-image', targetNodeId: 'node-video-6', targetPortId: 'in-image-end' },
-      { id: 'c45', sourceNodeId: 'node-planner', sourcePortId: 'scene6_video', targetNodeId: 'node-video-6', targetPortId: 'in-text' },
-      { id: 'c46', sourceNodeId: 'node-i2i-7', sourcePortId: 'out-image', targetNodeId: 'node-video-7', targetPortId: 'in-image-start' },
-      { id: 'c47', sourceNodeId: 'node-i2i-8', sourcePortId: 'out-image', targetNodeId: 'node-video-7', targetPortId: 'in-image-end' },
-      { id: 'c48', sourceNodeId: 'node-planner', sourcePortId: 'scene7_video', targetNodeId: 'node-video-7', targetPortId: 'in-text' },
-      { id: 'c49', sourceNodeId: 'node-i2i-8', sourcePortId: 'out-image', targetNodeId: 'node-video-8', targetPortId: 'in-image-start' },
-      { id: 'c50', sourceNodeId: 'node-i2i-9', sourcePortId: 'out-image', targetNodeId: 'node-video-8', targetPortId: 'in-image-end' },
-      { id: 'c51', sourceNodeId: 'node-planner', sourcePortId: 'scene8_video', targetNodeId: 'node-video-8', targetPortId: 'in-text' },
-      { id: 'c52', sourceNodeId: 'node-i2i-9', sourcePortId: 'out-image', targetNodeId: 'node-video-9', targetPortId: 'in-image-start' },
-      { id: 'c53', sourceNodeId: 'node-i2i-8', sourcePortId: 'out-image', targetNodeId: 'node-video-9', targetPortId: 'in-image-end' },
-      { id: 'c54', sourceNodeId: 'node-planner', sourcePortId: 'scene9_video', targetNodeId: 'node-video-9', targetPortId: 'in-text' }
+      // Image to video generation (i2v: each image generates one video)
+      { id: 'c28', sourceNodeId: 'node-i2i-1', sourcePortId: 'out-image', targetNodeId: 'node-video-1', targetPortId: 'in-image' },
+      { id: 'c29', sourceNodeId: 'node-planner', sourcePortId: 'scene1_video', targetNodeId: 'node-video-1', targetPortId: 'in-text' },
+      { id: 'c30', sourceNodeId: 'node-i2i-2', sourcePortId: 'out-image', targetNodeId: 'node-video-2', targetPortId: 'in-image' },
+      { id: 'c31', sourceNodeId: 'node-planner', sourcePortId: 'scene2_video', targetNodeId: 'node-video-2', targetPortId: 'in-text' },
+      { id: 'c32', sourceNodeId: 'node-i2i-3', sourcePortId: 'out-image', targetNodeId: 'node-video-3', targetPortId: 'in-image' },
+      { id: 'c33', sourceNodeId: 'node-planner', sourcePortId: 'scene3_video', targetNodeId: 'node-video-3', targetPortId: 'in-text' },
+      { id: 'c34', sourceNodeId: 'node-i2i-4', sourcePortId: 'out-image', targetNodeId: 'node-video-4', targetPortId: 'in-image' },
+      { id: 'c35', sourceNodeId: 'node-planner', sourcePortId: 'scene4_video', targetNodeId: 'node-video-4', targetPortId: 'in-text' },
+      { id: 'c36', sourceNodeId: 'node-i2i-5', sourcePortId: 'out-image', targetNodeId: 'node-video-5', targetPortId: 'in-image' },
+      { id: 'c37', sourceNodeId: 'node-planner', sourcePortId: 'scene5_video', targetNodeId: 'node-video-5', targetPortId: 'in-text' },
+      { id: 'c38', sourceNodeId: 'node-i2i-6', sourcePortId: 'out-image', targetNodeId: 'node-video-6', targetPortId: 'in-image' },
+      { id: 'c39', sourceNodeId: 'node-planner', sourcePortId: 'scene6_video', targetNodeId: 'node-video-6', targetPortId: 'in-text' },
+      { id: 'c40', sourceNodeId: 'node-i2i-7', sourcePortId: 'out-image', targetNodeId: 'node-video-7', targetPortId: 'in-image' },
+      { id: 'c41', sourceNodeId: 'node-planner', sourcePortId: 'scene7_video', targetNodeId: 'node-video-7', targetPortId: 'in-text' },
+      { id: 'c42', sourceNodeId: 'node-i2i-8', sourcePortId: 'out-image', targetNodeId: 'node-video-8', targetPortId: 'in-image' },
+      { id: 'c43', sourceNodeId: 'node-planner', sourcePortId: 'scene8_video', targetNodeId: 'node-video-8', targetPortId: 'in-text' },
+      { id: 'c44', sourceNodeId: 'node-i2i-9', sourcePortId: 'out-image', targetNodeId: 'node-video-9', targetPortId: 'in-image' },
+      { id: 'c45', sourceNodeId: 'node-planner', sourcePortId: 'scene9_video', targetNodeId: 'node-video-9', targetPortId: 'in-text' }
     ],
     nodes: [
       // Input nodes
@@ -434,12 +425,12 @@ Image generation approach:
 - And so on... Each scene uses the previous scene image + character image for continuity and character consistency
 
 Video generation:
-- Each scene will use dual-frame video (flf2v) with start frame and end frame
-- sceneN_video should describe the motion/camera movement for transitioning from start frame to end frame
+- Each scene will use image-to-video (i2v) generation
+- sceneN_video should describe the motion/camera movement for that scene
 
 For each scene, output:
 - sceneN_prompt: Detailed image generation prompt that describes the scene, maintaining character consistency (especially clothing/hair if changed - explicitly state if wearing same outfit/hair as previous scene) and scene consistency if in same location (explicitly describe same background elements)
-- sceneN_video: Video motion prompt describing camera movement and action for the transition
+- sceneN_video: Video motion prompt describing camera movement and action for that scene
 
 Output format: JSON with exactly these fields:
 - scene1_prompt, scene1_video
@@ -487,16 +478,16 @@ IMPORTANT: In each prompt, explicitly maintain consistency:
       { id: 'node-i2i-7', toolId: 'image-to-image', x: 750, y: 650, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
       { id: 'node-i2i-8', toolId: 'image-to-image', x: 750, y: 750, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
       { id: 'node-i2i-9', toolId: 'image-to-image', x: 750, y: 850, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      // Video generation nodes (all 9 scenes using dual-frame video)
-      { id: 'node-video-1', toolId: 'video-gen-dual-frame', x: 1100, y: 50, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-      { id: 'node-video-2', toolId: 'video-gen-dual-frame', x: 1100, y: 150, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-      { id: 'node-video-3', toolId: 'video-gen-dual-frame', x: 1100, y: 250, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-      { id: 'node-video-4', toolId: 'video-gen-dual-frame', x: 1100, y: 350, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-      { id: 'node-video-5', toolId: 'video-gen-dual-frame', x: 1100, y: 450, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-      { id: 'node-video-6', toolId: 'video-gen-dual-frame', x: 1100, y: 550, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-      { id: 'node-video-7', toolId: 'video-gen-dual-frame', x: 1100, y: 650, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-      { id: 'node-video-8', toolId: 'video-gen-dual-frame', x: 1100, y: 750, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-      { id: 'node-video-9', toolId: 'video-gen-dual-frame', x: 1100, y: 850, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } }
+      // Video generation nodes (all 9 scenes using image-to-video)
+      { id: 'node-video-1', toolId: 'video-gen-image', x: 1100, y: 50, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'node-video-2', toolId: 'video-gen-image', x: 1100, y: 150, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'node-video-3', toolId: 'video-gen-image', x: 1100, y: 250, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'node-video-4', toolId: 'video-gen-image', x: 1100, y: 350, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'node-video-5', toolId: 'video-gen-image', x: 1100, y: 450, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'node-video-6', toolId: 'video-gen-image', x: 1100, y: 550, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'node-video-7', toolId: 'video-gen-image', x: 1100, y: 650, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'node-video-8', toolId: 'video-gen-image', x: 1100, y: 750, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'node-video-9', toolId: 'video-gen-image', x: 1100, y: 850, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } }
     ]
   }
 ];
