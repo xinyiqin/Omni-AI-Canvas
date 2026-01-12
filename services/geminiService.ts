@@ -984,3 +984,135 @@ export const deepseekText = async (
 
   return text;
 };
+
+/**
+ * Doubao Vision Chat API Integration
+ * Uses the Doubao API endpoint for chat completions with vision support
+ */
+export const doubaoText = async (
+  prompt: string,
+  mode = 'basic',
+  customInstruction?: string,
+  model = 'doubao-1-5-vision-pro-32k-250115',
+  outputFields?: OutputField[],
+  imageInput?: string | string[] | any[]
+): Promise<any> => {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) {
+    throw new Error("API key is required. Please set DEEPSEEK_API_KEY environment variable.");
+  }
+
+  // Ensure prompt is a string
+  const promptStr = typeof prompt === 'string' ? prompt : String(prompt || '');
+
+  const systemInstructions: Record<string, string> = {
+    basic: "You are a helpful and versatile AI assistant. Provide clear, accurate, and direct answers.",
+    enhance: "You are a Prompt Engineering Expert. Enhance the user's input into a detailed prompt. Output ONLY the enhanced prompt.",
+    enhance_image: "Expand the user's input into a highly detailed image generation prompt. Output ONLY the prompt.",
+    enhance_video: "Expand the user's input into a cinematic video prompt. Describe camera and lighting. Output ONLY the prompt.",
+    enhance_tts: "Transform the input into a natural narration script. Output ONLY the text.",
+    summarize: "Extract core info into a concise summary.",
+    polish: "Refine text for clarity and tone.",
+  };
+
+  const baseInstruction = mode === 'custom' && customInstruction 
+    ? customInstruction 
+    : (systemInstructions[mode] || systemInstructions.basic);
+
+  const hasMultipleOutputs = outputFields && outputFields.length > 0;
+  const outputKeys = outputFields?.map(f => f.id) || [];
+
+  // Build messages array with system instruction and user prompt
+  const messages: Array<{ role: string; content: any }> = [];
+  
+  // Add system message if needed
+  if (baseInstruction && mode !== 'basic') {
+    messages.push({
+      role: 'system',
+      content: baseInstruction
+    });
+  }
+  
+  // Build user message content - support both text and images
+  const userContent: any[] = [];
+  
+  // Add images if provided
+  if (imageInput) {
+    const images = Array.isArray(imageInput) ? imageInput : [imageInput];
+    const flatImages = images.flat().filter(img => img && typeof img === 'string');
+    flatImages.forEach(img => {
+      // Handle both data URLs and URLs
+      const imageUrl = img.startsWith('http') ? img : (img.includes(',') ? img : `data:image/png;base64,${img}`);
+      userContent.push({
+        type: 'image_url',
+        image_url: {
+          url: imageUrl
+        }
+      });
+    });
+  }
+  
+  // Add text content
+  const textContent = hasMultipleOutputs
+    ? `${promptStr}\n\nIMPORTANT: You MUST generate content for each field as JSON: ${outputKeys.join(', ')}.`
+    : promptStr;
+  
+  userContent.push({
+    type: 'text',
+    text: textContent
+  });
+  
+  messages.push({
+    role: 'user',
+    content: userContent
+  });
+
+  const requestBody: any = {
+    model: model,
+    messages: messages,
+    temperature: 0.7,
+  };
+
+  // Add JSON mode for structured output if multiple outputs are required
+  if (hasMultipleOutputs) {
+    requestBody.response_format = { type: 'json_object' };
+  }
+
+  const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!response.ok) {
+    let errorMessage = `Doubao API failed (${response.status})`;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.error?.message || errorData.error || errorMessage;
+    } catch (e) {
+      const errorText = await response.text();
+      errorMessage = errorText || errorMessage;
+    }
+    throw new Error(errorMessage);
+  }
+
+  const data = await response.json();
+  const text = data.choices?.[0]?.message?.content || "";
+
+  if (hasMultipleOutputs) {
+    try {
+      const parsed = JSON.parse(text);
+      outputKeys.forEach(key => { if (!(key in parsed)) parsed[key] = "..."; });
+      return parsed;
+    } catch (e) {
+      const fallback: Record<string, string> = {};
+      outputKeys.forEach((key, i) => fallback[key] = i === 0 ? text : "...");
+      return fallback;
+    }
+  }
+
+  return text;
+};

@@ -10,14 +10,15 @@ import {
   Camera, Mic, Wand, ListPlus, Hash, Info, PlayCircle, FastForward, ArrowUpRight,
   Target, Activity, History, Clock, Maximize2, DownloadCloud, BookOpen, ChevronLeft,
   Calendar, LayoutGrid, Sparkle, ToggleLeft, ToggleRight, Timer, PlayCircle as PlayIcon,
-  Key, Globe2, Upload, Languages, ShieldCheck, TriangleAlert, SaveAll
+  Key, Globe2, Upload, Languages, ShieldCheck, TriangleAlert, SaveAll, Eraser
 } from 'lucide-react';
 import { TOOLS } from './constants';
 import { 
   WorkflowNode, Connection, WorkflowState, 
   NodeStatus, DataType, Port, ToolDefinition, GenerationRun
 } from './types';
-import { geminiText, geminiImage, geminiSpeech, geminiVideo, lightX2VTask, lightX2VTTS, lightX2VVoiceClone, lightX2VVoiceCloneTTS, lightX2VGetVoiceList, lightX2VGetCloneVoiceList, deepseekText } from './services/geminiService';
+import { geminiText, geminiImage, geminiSpeech, geminiVideo, lightX2VTask, lightX2VTTS, lightX2VVoiceClone, lightX2VVoiceCloneTTS, lightX2VGetVoiceList, lightX2VGetCloneVoiceList, deepseekText, doubaoText } from './services/geminiService';
+import { removeGeminiWatermark } from './services/watermarkRemover';
 
 // --- Localization ---
 
@@ -257,9 +258,7 @@ const PRESET_WORKFLOWS: WorkflowState[] = [
       lightx2v_url: "",
       lightx2v_token: ""
     },
-    globalInputs: {
-      'node-avatar-in-text': "根据音频生成对应视频"
-    },
+    globalInputs: {},
     history: [],
     showIntermediateResults: false,
     connections: [
@@ -268,17 +267,54 @@ const PRESET_WORKFLOWS: WorkflowState[] = [
       { id: 'c3', sourceNodeId: 'node-chat', sourcePortId: 'speech_text', targetNodeId: 'node-tts', targetPortId: 'in-text' },
       { id: 'c4', sourceNodeId: 'node-chat', sourcePortId: 'tone', targetNodeId: 'node-tts', targetPortId: 'in-context-tone' },
       { id: 'c5', sourceNodeId: 'node-image', sourcePortId: 'out-image', targetNodeId: 'node-avatar', targetPortId: 'in-image' },
-      { id: 'c6', sourceNodeId: 'node-tts', sourcePortId: 'out-audio', targetNodeId: 'node-avatar', targetPortId: 'in-audio' }
+      { id: 'c6', sourceNodeId: 'node-tts', sourcePortId: 'out-audio', targetNodeId: 'node-avatar', targetPortId: 'in-audio' },
+      { id: 'c7', sourceNodeId: 'node-chat', sourcePortId: 'avatar_video_prompt', targetNodeId: 'node-avatar', targetPortId: 'in-text' }
     ],
     nodes: [
       { id: 'node-prompt', toolId: 'text-prompt', x: 100, y: 200, status: NodeStatus.IDLE, data: { value: "A man teach me not to sleep late in an overbearing CEO style." } },
       { id: 'node-chat', toolId: 'gemini-text', x: 450, y: 200, status: NodeStatus.IDLE, data: { 
           model: 'deepseek-v3-2-251201',
-          mode: 'basic',
+          mode: 'custom',
+          customInstruction: `You are a professional digital avatar video script writer. Your task is to create a complete script package for a digital avatar video based on the user's input description.
+
+CRITICAL: Generate high-quality, natural, and engaging content for a digital avatar video.
+
+For speech_text:
+- Write a natural, conversational script that sounds authentic when spoken
+- Keep it concise (20-40 seconds when spoken at normal pace)
+- Use clear, direct language that matches the character's personality and style
+- Ensure the script flows naturally and is easy to understand
+- Match the tone and energy described in the user's input
+
+For tone:
+- Provide detailed voice acting instructions that capture the character's personality
+- Include emotional cues, pacing, emphasis points, and vocal characteristics
+- Describe how the voice should sound (e.g., warm, authoritative, friendly, serious)
+- Include specific moments where tone should shift or emphasize certain words/phrases
+- Make it actionable for TTS systems to produce natural-sounding speech
+
+For image_prompt:
+- Create a detailed portrait description that matches the character described
+- Include facial features, age, expression, clothing, background, lighting
+- Ensure the description is suitable for portrait image generation
+- Match the character's personality and style from the user's input
+- Include visual details that will make the avatar look professional and engaging
+
+For avatar_video_prompt:
+- Describe natural, realistic talking gestures and movements
+- Include head movements (nodding, tilting, slight turns)
+- Describe facial expressions that match the speech content and emotional tone
+- Include body language and hand gestures if appropriate
+- Specify eye contact and gaze direction
+- Ensure movements are synchronized with the speech rhythm
+- Make it detailed enough to guide the avatar video generation for natural, lifelike results
+
+Output all four fields in JSON format.`,
           customOutputs: [
             { id: 'speech_text', label: 'Speech Script', description: 'The text the CEO says to the listener.' },
             { id: 'tone', label: 'Tone Instruction', description: 'Cues for speech style (e.g. commanding, deep, protective).' },
-            { id: 'image_prompt', label: 'Portrait Prompt', description: 'Description of the overbearing CEO for an image generator.' }
+            { id: 'image_prompt', label: 'Portrait Prompt', description: 'Description of the overbearing CEO for an image generator.' },
+            { id: 'avatar_video_prompt', label: 'Avatar Video Action Prompt', description: 'Description of the avatar video action and movement (e.g. natural talking gestures, head movements, facial expressions).' }
           ]
       } },
       { id: 'node-image', toolId: 'text-to-image', x: 850, y: 50, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-2512', aspectRatio: "9:16" } },
@@ -489,6 +525,157 @@ IMPORTANT: In each prompt, explicitly maintain consistency:
       { id: 'node-video-8', toolId: 'video-gen-image', x: 1100, y: 750, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
       { id: 'node-video-9', toolId: 'video-gen-image', x: 1100, y: 850, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } }
     ]
+  },
+  {
+    id: 'preset-multi-shot-singing',
+    name: '多机位唱歌',
+    updatedAt: Date.now(),
+    isDirty: false,
+    isRunning: false,
+    env: {
+      lightx2v_url: "",
+      lightx2v_token: ""
+    },
+    globalInputs: {},
+    history: [],
+    showIntermediateResults: true,
+    connections: [
+      // Input to AI Chat
+      { id: 'c1', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-planner', targetPortId: 'in-image' },
+      { id: 'c2', sourceNodeId: 'node-text-in', sourcePortId: 'out-text', targetNodeId: 'node-planner', targetPortId: 'in-text' },
+      // AI Chat to Image-to-Image (9 shots)
+      { id: 'c3', sourceNodeId: 'node-planner', sourcePortId: 'shot1_image_prompt', targetNodeId: 'node-i2i-1', targetPortId: 'in-text' },
+      { id: 'c4', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-1', targetPortId: 'in-image' },
+      { id: 'c5', sourceNodeId: 'node-planner', sourcePortId: 'shot2_image_prompt', targetNodeId: 'node-i2i-2', targetPortId: 'in-text' },
+      { id: 'c6', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-2', targetPortId: 'in-image' },
+      { id: 'c7', sourceNodeId: 'node-planner', sourcePortId: 'shot3_image_prompt', targetNodeId: 'node-i2i-3', targetPortId: 'in-text' },
+      { id: 'c8', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-3', targetPortId: 'in-image' },
+      { id: 'c9', sourceNodeId: 'node-planner', sourcePortId: 'shot4_image_prompt', targetNodeId: 'node-i2i-4', targetPortId: 'in-text' },
+      { id: 'c10', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-4', targetPortId: 'in-image' },
+      { id: 'c11', sourceNodeId: 'node-planner', sourcePortId: 'shot5_image_prompt', targetNodeId: 'node-i2i-5', targetPortId: 'in-text' },
+      { id: 'c12', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-5', targetPortId: 'in-image' },
+      { id: 'c28', sourceNodeId: 'node-planner', sourcePortId: 'shot6_image_prompt', targetNodeId: 'node-i2i-6', targetPortId: 'in-text' },
+      { id: 'c29', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-6', targetPortId: 'in-image' },
+      { id: 'c30', sourceNodeId: 'node-planner', sourcePortId: 'shot7_image_prompt', targetNodeId: 'node-i2i-7', targetPortId: 'in-text' },
+      { id: 'c31', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-7', targetPortId: 'in-image' },
+      { id: 'c32', sourceNodeId: 'node-planner', sourcePortId: 'shot8_image_prompt', targetNodeId: 'node-i2i-8', targetPortId: 'in-text' },
+      { id: 'c33', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-8', targetPortId: 'in-image' },
+      { id: 'c34', sourceNodeId: 'node-planner', sourcePortId: 'shot9_image_prompt', targetNodeId: 'node-i2i-9', targetPortId: 'in-text' },
+      { id: 'c35', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-9', targetPortId: 'in-image' },
+      // Image-to-Image to Avatar Video (9 shots)
+      { id: 'c13', sourceNodeId: 'node-i2i-1', sourcePortId: 'out-image', targetNodeId: 'node-avatar-1', targetPortId: 'in-image' },
+      { id: 'c14', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-1', targetPortId: 'in-audio' },
+      { id: 'c15', sourceNodeId: 'node-planner', sourcePortId: 'shot1_video_prompt', targetNodeId: 'node-avatar-1', targetPortId: 'in-text' },
+      { id: 'c16', sourceNodeId: 'node-i2i-2', sourcePortId: 'out-image', targetNodeId: 'node-avatar-2', targetPortId: 'in-image' },
+      { id: 'c17', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-2', targetPortId: 'in-audio' },
+      { id: 'c18', sourceNodeId: 'node-planner', sourcePortId: 'shot2_video_prompt', targetNodeId: 'node-avatar-2', targetPortId: 'in-text' },
+      { id: 'c19', sourceNodeId: 'node-i2i-3', sourcePortId: 'out-image', targetNodeId: 'node-avatar-3', targetPortId: 'in-image' },
+      { id: 'c20', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-3', targetPortId: 'in-audio' },
+      { id: 'c21', sourceNodeId: 'node-planner', sourcePortId: 'shot3_video_prompt', targetNodeId: 'node-avatar-3', targetPortId: 'in-text' },
+      { id: 'c22', sourceNodeId: 'node-i2i-4', sourcePortId: 'out-image', targetNodeId: 'node-avatar-4', targetPortId: 'in-image' },
+      { id: 'c23', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-4', targetPortId: 'in-audio' },
+      { id: 'c24', sourceNodeId: 'node-planner', sourcePortId: 'shot4_video_prompt', targetNodeId: 'node-avatar-4', targetPortId: 'in-text' },
+      { id: 'c25', sourceNodeId: 'node-i2i-5', sourcePortId: 'out-image', targetNodeId: 'node-avatar-5', targetPortId: 'in-image' },
+      { id: 'c26', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-5', targetPortId: 'in-audio' },
+      { id: 'c27', sourceNodeId: 'node-planner', sourcePortId: 'shot5_video_prompt', targetNodeId: 'node-avatar-5', targetPortId: 'in-text' },
+      { id: 'c36', sourceNodeId: 'node-i2i-6', sourcePortId: 'out-image', targetNodeId: 'node-avatar-6', targetPortId: 'in-image' },
+      { id: 'c37', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-6', targetPortId: 'in-audio' },
+      { id: 'c38', sourceNodeId: 'node-planner', sourcePortId: 'shot6_video_prompt', targetNodeId: 'node-avatar-6', targetPortId: 'in-text' },
+      { id: 'c39', sourceNodeId: 'node-i2i-7', sourcePortId: 'out-image', targetNodeId: 'node-avatar-7', targetPortId: 'in-image' },
+      { id: 'c40', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-7', targetPortId: 'in-audio' },
+      { id: 'c41', sourceNodeId: 'node-planner', sourcePortId: 'shot7_video_prompt', targetNodeId: 'node-avatar-7', targetPortId: 'in-text' },
+      { id: 'c42', sourceNodeId: 'node-i2i-8', sourcePortId: 'out-image', targetNodeId: 'node-avatar-8', targetPortId: 'in-image' },
+      { id: 'c43', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-8', targetPortId: 'in-audio' },
+      { id: 'c44', sourceNodeId: 'node-planner', sourcePortId: 'shot8_video_prompt', targetNodeId: 'node-avatar-8', targetPortId: 'in-text' },
+      { id: 'c45', sourceNodeId: 'node-i2i-9', sourcePortId: 'out-image', targetNodeId: 'node-avatar-9', targetPortId: 'in-image' },
+      { id: 'c46', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-9', targetPortId: 'in-audio' },
+      { id: 'c47', sourceNodeId: 'node-planner', sourcePortId: 'shot9_video_prompt', targetNodeId: 'node-avatar-9', targetPortId: 'in-text' }
+    ],
+    nodes: [
+      // Input nodes
+      { id: 'node-char-img', toolId: 'image-input', x: 50, y: 500, status: NodeStatus.IDLE, data: { value: [] } },
+      { id: 'node-audio-in', toolId: 'audio-input', x: 50, y: 700, status: NodeStatus.IDLE, data: { value: null } },
+      { id: 'node-text-in', toolId: 'text-prompt', x: 50, y: 200, status: NodeStatus.IDLE, data: { value: "A professional singer performing a pop song with dynamic movements and expressions" } },
+      // AI Chat Planner (Doubao Vision)
+      { id: 'node-planner', toolId: 'gemini-text', x: 350, y: 400, status: NodeStatus.IDLE, data: { 
+          model: 'doubao-1-5-vision-pro-32k-250115',
+          mode: 'custom',
+          customInstruction: `You are a professional multi-camera music video director. Your task is to analyze the input character image and optional text description, then generate detailed descriptions for 9 different camera shots for a singing performance.
+
+CRITICAL: Character consistency is PARAMOUNT. The same character must appear in all shots with identical facial features, body shape, clothing, and appearance.
+
+Generate 9 distinct camera shots:
+1. Shot 1 - Close-up (特写): Face-focused shot showing detailed facial expressions, emotions, and lip-sync
+2. Shot 2 - Medium shot (中景): Upper body shot showing head, shoulders, and some arm movements
+3. Shot 3 - Wide shot (全景): Full body shot showing the entire character with background
+4. Shot 4 - Top-down shot (俯拍): Overhead or high-angle shot looking down at the character
+5. Shot 5 - Side angle (侧方位): Profile or 3/4 angle shot showing the character from the side
+6. Shot 6 - Low angle (仰拍): Low-angle shot looking up at the character, emphasizing power and presence
+7. Shot 7 - Dutch angle (倾斜角度): Tilted camera angle creating dynamic and energetic feel
+8. Shot 8 - Over-shoulder (过肩): Over-the-shoulder shot showing the character from behind, creating intimacy
+9. Shot 9 - Extreme close-up (极特写): Extreme close-up focusing on eyes, mouth, or specific facial features
+
+For each shot, generate:
+- shotN_image_prompt: Detailed image generation prompt that describes the character in that specific camera angle and framing, maintaining exact character consistency (same face, clothing, appearance). Include camera angle, framing, background, lighting, and character pose/expression.
+- shotN_video_prompt: Detailed video action description for the digital avatar, including singing gestures, head movements, body language, facial expressions, and movements that match the song's rhythm and energy.
+
+Output format: JSON with exactly these fields:
+- shot1_image_prompt, shot1_video_prompt
+- shot2_image_prompt, shot2_video_prompt
+- shot3_image_prompt, shot3_video_prompt
+- shot4_image_prompt, shot4_video_prompt
+- shot5_image_prompt, shot5_video_prompt
+- shot6_image_prompt, shot6_video_prompt
+- shot7_image_prompt, shot7_video_prompt
+- shot8_image_prompt, shot8_video_prompt
+- shot9_image_prompt, shot9_video_prompt
+
+IMPORTANT: 
+- Maintain EXACT character consistency across all shots (same face, clothing, appearance)
+- Each shot should have a distinct camera angle and framing
+- Video prompts should describe natural singing movements and expressions`,
+          customOutputs: [
+            { id: 'shot1_image_prompt', label: 'Shot 1 Image Prompt (Close-up)', description: 'Close-up shot image description' },
+            { id: 'shot1_video_prompt', label: 'Shot 1 Video Prompt', description: 'Close-up shot video action description' },
+            { id: 'shot2_image_prompt', label: 'Shot 2 Image Prompt (Medium)', description: 'Medium shot image description' },
+            { id: 'shot2_video_prompt', label: 'Shot 2 Video Prompt', description: 'Medium shot video action description' },
+            { id: 'shot3_image_prompt', label: 'Shot 3 Image Prompt (Wide)', description: 'Wide shot image description' },
+            { id: 'shot3_video_prompt', label: 'Shot 3 Video Prompt', description: 'Wide shot video action description' },
+            { id: 'shot4_image_prompt', label: 'Shot 4 Image Prompt (Top-down)', description: 'Top-down shot image description' },
+            { id: 'shot4_video_prompt', label: 'Shot 4 Video Prompt', description: 'Top-down shot video action description' },
+            { id: 'shot5_image_prompt', label: 'Shot 5 Image Prompt (Side)', description: 'Side angle shot image description' },
+            { id: 'shot5_video_prompt', label: 'Shot 5 Video Prompt', description: 'Side angle shot video action description' },
+            { id: 'shot6_image_prompt', label: 'Shot 6 Image Prompt (Low angle)', description: 'Low-angle shot image description' },
+            { id: 'shot6_video_prompt', label: 'Shot 6 Video Prompt', description: 'Low-angle shot video action description' },
+            { id: 'shot7_image_prompt', label: 'Shot 7 Image Prompt (Dutch angle)', description: 'Dutch angle shot image description' },
+            { id: 'shot7_video_prompt', label: 'Shot 7 Video Prompt', description: 'Dutch angle shot video action description' },
+            { id: 'shot8_image_prompt', label: 'Shot 8 Image Prompt (Over-shoulder)', description: 'Over-shoulder shot image description' },
+            { id: 'shot8_video_prompt', label: 'Shot 8 Video Prompt', description: 'Over-shoulder shot video action description' },
+            { id: 'shot9_image_prompt', label: 'Shot 9 Image Prompt (Extreme close-up)', description: 'Extreme close-up shot image description' },
+            { id: 'shot9_video_prompt', label: 'Shot 9 Video Prompt', description: 'Extreme close-up shot video action description' }
+          ]
+      } },
+      // Image-to-Image nodes (9 shots)
+      { id: 'node-i2i-1', toolId: 'image-to-image', x: 800, y: 50, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'node-i2i-2', toolId: 'image-to-image', x: 800, y: 150, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'node-i2i-3', toolId: 'image-to-image', x: 800, y: 250, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'node-i2i-4', toolId: 'image-to-image', x: 800, y: 350, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'node-i2i-5', toolId: 'image-to-image', x: 800, y: 450, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'node-i2i-6', toolId: 'image-to-image', x: 800, y: 550, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'node-i2i-7', toolId: 'image-to-image', x: 800, y: 650, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'node-i2i-8', toolId: 'image-to-image', x: 800, y: 750, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'node-i2i-9', toolId: 'image-to-image', x: 800, y: 850, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      // Avatar Video nodes (9 shots)
+      { id: 'node-avatar-1', toolId: 'avatar-gen', x: 1200, y: 50, status: NodeStatus.IDLE, data: {} },
+      { id: 'node-avatar-2', toolId: 'avatar-gen', x: 1200, y: 150, status: NodeStatus.IDLE, data: {} },
+      { id: 'node-avatar-3', toolId: 'avatar-gen', x: 1200, y: 250, status: NodeStatus.IDLE, data: {} },
+      { id: 'node-avatar-4', toolId: 'avatar-gen', x: 1200, y: 350, status: NodeStatus.IDLE, data: {} },
+      { id: 'node-avatar-5', toolId: 'avatar-gen', x: 1200, y: 450, status: NodeStatus.IDLE, data: {} },
+      { id: 'node-avatar-6', toolId: 'avatar-gen', x: 1200, y: 550, status: NodeStatus.IDLE, data: {} },
+      { id: 'node-avatar-7', toolId: 'avatar-gen', x: 1200, y: 650, status: NodeStatus.IDLE, data: {} },
+      { id: 'node-avatar-8', toolId: 'avatar-gen', x: 1200, y: 750, status: NodeStatus.IDLE, data: {} },
+      { id: 'node-avatar-9', toolId: 'avatar-gen', x: 1200, y: 850, status: NodeStatus.IDLE, data: {} }
+    ]
   }
 ];
 
@@ -533,6 +720,8 @@ const App: React.FC = () => {
   const [isGeneratingWorkflow, setIsGeneratingWorkflow] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const isPausedRef = useRef(false);
+  const [showReplaceMenu, setShowReplaceMenu] = useState<string | null>(null);
+  const [showAudioEditor, setShowAudioEditor] = useState<string | null>(null); // nodeId of audio input being edited
   
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -1190,12 +1379,154 @@ Output ONLY the JSON, no additional text or markdown.`;
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedNodeId, selectedConnectionId]);
 
+  // Close replace menu when clicking outside
+  useEffect(() => {
+    if (!showReplaceMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.replace-menu-container')) {
+        setShowReplaceMenu(null);
+      }
+    };
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, [showReplaceMenu]);
+
   const deleteSelectedNode = useCallback(() => {
     if (!selectedNodeId) return;
     if (selectedRunId) setSelectedRunId(null);
     setWorkflow(prev => prev ? ({ ...prev, nodes: prev.nodes.filter(n => n.id !== selectedNodeId), connections: prev.connections.filter(c => c.sourceNodeId !== selectedNodeId && c.targetNodeId !== selectedNodeId), isDirty: true }) : null);
     setSelectedNodeId(null);
   }, [selectedNodeId, selectedRunId]);
+
+  // Get compatible tools for replacement (same output count and types)
+  const getReplaceableTools = useCallback((nodeId: string): ToolDefinition[] => {
+    if (!workflow) return [];
+    const node = workflow.nodes.find(n => n.id === nodeId);
+    if (!node) return [];
+    
+    const currentNodeOutputs = getNodeOutputs(node);
+    const outputTypes = currentNodeOutputs.map(o => o.type);
+    const outputCount = currentNodeOutputs.length;
+    
+    // Find all tools with matching output count and types
+    return TOOLS.filter(tool => {
+      // Skip the current tool itself
+      if (tool.id === node.toolId) return false;
+      
+      // For gemini-text with customOutputs, check if it has the same number of outputs
+      if (tool.id === 'gemini-text') {
+        // If current node is also gemini-text, allow replacement (customOutputs can be different)
+        if (node.toolId === 'gemini-text') {
+          return true;
+        }
+        // Otherwise, only allow if gemini-text can have the same number of outputs
+        // Since gemini-text can have dynamic outputs, we allow it if output count matches
+        return true; // Allow replacement, but will be validated in replaceNode
+      }
+      
+      // For current node being gemini-text, only allow tools with matching output count
+      if (node.toolId === 'gemini-text') {
+        // Check if tool has the same number of outputs
+        if (tool.outputs.length !== outputCount) return false;
+        // Check if all output types match (gemini-text outputs are all TEXT)
+        return tool.outputs.every((out, idx) => out.type === outputTypes[idx]);
+      }
+      
+      // Check if output count matches
+      if (tool.outputs.length !== outputCount) return false;
+      
+      // Check if all output types match
+      return tool.outputs.every((out, idx) => out.type === outputTypes[idx]);
+    });
+  }, [workflow]);
+
+  // Replace a node with another compatible tool
+  const replaceNode = useCallback((nodeId: string, newToolId: string) => {
+    if (!workflow) return;
+    const node = workflow.nodes.find(n => n.id === nodeId);
+    if (!node) return;
+    
+    const newTool = TOOLS.find(t => t.id === newToolId);
+    if (!newTool) return;
+    
+    // Get current node outputs
+    const currentNodeOutputs = getNodeOutputs(node);
+    
+    // Handle gemini-text special case (dynamic outputs)
+    let newToolOutputs: Port[] = [];
+    if (newToolId === 'gemini-text') {
+      // If replacing with gemini-text, preserve customOutputs if they exist
+      if (node.toolId === 'gemini-text' && node.data.customOutputs) {
+        newToolOutputs = node.data.customOutputs.map((o: any) => ({ ...o, type: DataType.TEXT }));
+      } else {
+        // Otherwise, use default outputs (empty for gemini-text)
+        newToolOutputs = [];
+      }
+    } else {
+      newToolOutputs = newTool.outputs;
+    }
+    
+    // Check if outputs are compatible
+    if (currentNodeOutputs.length !== newToolOutputs.length) return;
+    const isCompatible = currentNodeOutputs.every((out, idx) => {
+      if (idx >= newToolOutputs.length) return false;
+      return out.type === newToolOutputs[idx].type;
+    });
+    if (!isCompatible) return;
+    
+    // Create a mapping of old output port IDs to new ones
+    const outputPortMap: Record<string, string> = {};
+    currentNodeOutputs.forEach((oldOut, idx) => {
+      if (idx < newToolOutputs.length) {
+        outputPortMap[oldOut.id] = newToolOutputs[idx].id;
+      }
+    });
+    
+    // Update the node
+    setWorkflow(prev => {
+      if (!prev) return null;
+      
+      // Create new node with new tool
+      const newNode: WorkflowNode = {
+        ...node,
+        toolId: newToolId,
+        data: {
+          ...node.data,
+          // Reset model if the new tool doesn't have models
+          model: newTool.models && newTool.models.length > 0 ? (newTool.models[0].id || node.data.model) : undefined,
+          // Preserve customOutputs if replacing with gemini-text and current node has them
+          customOutputs: (newToolId === 'gemini-text' && node.toolId === 'gemini-text' && node.data.customOutputs) ? node.data.customOutputs : (newToolId === 'gemini-text' ? undefined : node.data.customOutputs)
+        },
+        status: NodeStatus.IDLE,
+        error: undefined,
+        executionTime: undefined,
+        startTime: undefined
+      };
+      
+      // Update connections: map old output port IDs to new ones
+      const updatedConnections = prev.connections.map(conn => {
+        if (conn.sourceNodeId === nodeId) {
+          const newSourcePortId = outputPortMap[conn.sourcePortId];
+          if (newSourcePortId) {
+            return { ...conn, sourcePortId: newSourcePortId };
+          }
+          // If no mapping found, remove the connection
+          return null;
+        }
+        return conn;
+      }).filter((c): c is Connection => c !== null);
+      
+      return {
+        ...prev,
+        nodes: prev.nodes.map(n => n.id === nodeId ? newNode : n),
+        connections: updatedConnections,
+        isDirty: true
+      };
+    });
+    
+    setShowReplaceMenu(null);
+  }, [workflow]);
 
   const deleteSelectedConnection = useCallback(() => {
     if (!selectedConnectionId) return;
@@ -1397,17 +1728,21 @@ Output ONLY the JSON, no additional text or markdown.`;
     const executedInSession = new Set<string>();
     const sessionOutputs: Record<string, any> = {};
     
+    // If running from a specific node, preserve outputs from nodes that won't be re-run
+    // Otherwise, clear all outputs for a fresh start
     if (startNodeId) {
       Object.entries(activeOutputs).forEach(([nodeId, val]) => {
         if (!nodesToRunIds.has(nodeId)) sessionOutputs[nodeId] = val;
       });
+      setActiveOutputs(prev => {
+        const next = { ...prev };
+        nodesToRunIds.forEach(id => delete next[id]);
+        return next;
+      });
+    } else {
+      // Full workflow run: clear all outputs to prevent memory accumulation
+      setActiveOutputs({});
     }
-    
-    setActiveOutputs(prev => {
-      const next = { ...prev };
-      nodesToRunIds.forEach(id => delete next[id]);
-      return next;
-    });
 
     // Get LightX2V config once at the start of workflow execution
     const lightX2VConfig = getLightX2VConfig(workflow);
@@ -1513,9 +1848,12 @@ Output ONLY the JSON, no additional text or markdown.`;
                 case 'web-search': result = await geminiText(nodeInputs['in-text'] || "Search query", true, 'basic', undefined, model); break;
                 case 'gemini-text': 
                   const outputFields = (node.data.customOutputs || []).map((o: any) => ({ id: o.id, description: o.description || o.label }));
-                  // Use DeepSeek for deepseek models, otherwise use Gemini
+                  // Use DeepSeek for deepseek models, Doubao for doubao models, otherwise use Gemini
                   if (model && model.startsWith('deepseek-')) {
                     result = await deepseekText(nodeInputs['in-text'] || "...", node.data.mode, node.data.customInstruction, model, outputFields);
+                  } else if (model && model.startsWith('doubao-')) {
+                    const imageInput = nodeInputs['in-image'];
+                    result = await doubaoText(nodeInputs['in-text'] || "...", node.data.mode, node.data.customInstruction, model, outputFields, imageInput);
                   } else {
                   result = await geminiText(nodeInputs['in-text'] || "...", false, node.data.mode, node.data.customInstruction, model, outputFields); 
                   }
@@ -1561,6 +1899,11 @@ Output ONLY the JSON, no additional text or markdown.`;
                       node.data.aspectRatio
                     );
                   }
+                  break;
+                case 'gemini-watermark-remover':
+                  const watermarkImg = Array.isArray(nodeInputs['in-image']) ? nodeInputs['in-image'][0] : nodeInputs['in-image'];
+                  if (!watermarkImg) throw new Error("Image input is required for watermark removal");
+                  result = await removeGeminiWatermark(watermarkImg);
                   break;
                 case 'tts': 
                   // Determine which service to use based on model
@@ -1739,7 +2082,10 @@ Output ONLY the JSON, no additional text or markdown.`;
           // Wait for all nodes in this batch to complete
           const results = await Promise.allSettled(executionPromises);
           
-          // Process results and update state
+          // Process results and update state - batch updates to reduce re-renders
+          const successfulResults: Array<{ nodeId: string; result: any; duration: number }> = [];
+          const failedNodes: Array<{ nodeId: string; error: any; duration: number }> = [];
+          
           results.forEach((settledResult, index) => {
             const node = batch[index];
             if (settledResult.status === 'fulfilled') {
@@ -1753,25 +2099,80 @@ Output ONLY the JSON, no additional text or markdown.`;
               if (errorInfo && errorInfo.error) {
                 // Error was already handled in the catch block, just mark as executed
                 executedInSession.add(errorInfo.nodeId);
+                failedNodes.push({ nodeId: errorInfo.nodeId, error: errorInfo.error, duration: errorInfo.duration || 0 });
               } else {
                 // Unhandled error
                 const nodeDuration = performance.now() - (node.startTime || performance.now());
-                setWorkflow(prev => prev ? ({ ...prev, nodes: prev.nodes.map(n => n.id === node.id ? { ...n, status: NodeStatus.ERROR, error: 'Unknown execution error', executionTime: nodeDuration } : n) }) : null);
+                failedNodes.push({ nodeId: node.id, error: 'Unknown execution error', duration: nodeDuration });
                 executedInSession.add(node.id);
               }
             }
           });
+          
+          // Batch update state for successful results
+          if (successfulResults.length > 0) {
+            setActiveOutputs(prev => {
+              const next = { ...prev };
+              successfulResults.forEach(({ nodeId, result }) => {
+                next[nodeId] = result;
+              });
+              return next;
+            });
+            
+            setWorkflow(prev => {
+              if (!prev) return null;
+              const updatedNodes = [...prev.nodes];
+              successfulResults.forEach(({ nodeId, duration }) => {
+                const index = updatedNodes.findIndex(n => n.id === nodeId);
+                if (index >= 0) {
+                  updatedNodes[index] = { ...updatedNodes[index], status: NodeStatus.SUCCESS, executionTime: duration };
+                }
+              });
+              return { ...prev, nodes: updatedNodes };
+            });
+          }
+          
+          // Batch update state for failed nodes
+          if (failedNodes.length > 0) {
+            setWorkflow(prev => {
+              if (!prev) return null;
+              const updatedNodes = [...prev.nodes];
+              failedNodes.forEach(({ nodeId, error, duration }) => {
+                const index = updatedNodes.findIndex(n => n.id === nodeId);
+                if (index >= 0) {
+                  updatedNodes[index] = { ...updatedNodes[index], status: NodeStatus.ERROR, error, executionTime: duration };
+                }
+              });
+              return { ...prev, nodes: updatedNodes };
+            });
+          }
         }
       }
       const runTotalTime = performance.now() - runStartTime;
+      
+      // Optimize history storage: only keep essential data, limit history size
+      // Create a lightweight snapshot without deep copying all node data
+      const lightweightNodesSnapshot = workflow.nodes.map(n => ({
+        id: n.id,
+        toolId: n.toolId,
+        x: n.x,
+        y: n.y,
+        status: n.status,
+        data: { ...n.data }, // Shallow copy of data
+        error: n.error,
+        executionTime: n.executionTime
+      }));
+      
       const newRun: GenerationRun = { 
         id: `run-${Date.now()}`, 
         timestamp: Date.now(), 
         outputs: { ...sessionOutputs }, 
-        nodesSnapshot: [...workflow.nodes.map(n => ({ ...n }))],
+        nodesSnapshot: lightweightNodesSnapshot,
         totalTime: runTotalTime 
       };
-      setWorkflow(prev => prev ? ({ ...prev, history: [newRun, ...prev.history].slice(0, 10) }) : null);
+      
+      // Limit history to 5 runs to reduce memory usage (was 10)
+      setWorkflow(prev => prev ? ({ ...prev, history: [newRun, ...prev.history].slice(0, 5) }) : null);
       setSelectedRunId(newRun.id);
     } catch (e) { 
       console.error(e); 
@@ -2108,9 +2509,9 @@ Output ONLY the JSON, no additional text or markdown.`;
       <div className="flex-1 flex overflow-hidden relative">
         <aside className="w-72 border-r border-slate-800/60 bg-slate-900/40 backdrop-blur-xl flex flex-col z-30 overflow-y-auto p-4 space-y-8">
            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">{t('tool_palette')}</h3>
-           {['Input', 'AI Model'].map(cat => (
+           {['Input', 'AI Model', 'Image Processing'].map(cat => (
              <div key={cat} className="space-y-2.5">
-               <span className="text-[9px] text-slate-600 font-black uppercase">{lang === 'zh' ? (cat === 'Input' ? '输入' : 'AI 模型') : cat}</span>
+               <span className="text-[9px] text-slate-600 font-black uppercase">{lang === 'zh' ? (cat === 'Input' ? '输入' : cat === 'AI Model' ? 'AI 模型' : '图像处理') : cat}</span>
                {TOOLS.filter(t => t.category === cat).map(tool => (
                  <div key={tool.id} onClick={() => addNode(tool)} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-800/20 border border-slate-800/60 hover:border-indigo-500/40 hover:bg-slate-800/40 cursor-pointer transition-all active:scale-95 group"><div className="p-2.5 rounded-xl bg-slate-800 group-hover:bg-indigo-600 group-hover:text-white transition-colors">{React.createElement(getIcon(tool.icon), { size: 16 })}</div><div className="flex flex-col"><span className="text-xs font-bold text-slate-300">{lang === 'zh' ? tool.name_zh : tool.name}</span><span className="text-[9px] text-slate-500 line-clamp-1">{lang === 'zh' ? tool.description_zh : tool.description}</span></div></div>
                ))}
@@ -2194,13 +2595,57 @@ Output ONLY the JSON, no additional text or markdown.`;
                 }}>
                   
                   {isSelected && (
-                    <button
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onClick={(e) => { e.stopPropagation(); deleteSelectedNode(); }}
-                      className="absolute -top-14 left-1/2 -translate-x-1/2 p-2 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition-all z-20 active:scale-90"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="absolute -top-14 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20 replace-menu-container">
+                      <div className="relative">
+                        <button
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setShowReplaceMenu(showReplaceMenu === node.id ? null : node.id);
+                          }}
+                          className="p-2 bg-indigo-500 text-white rounded-full shadow-lg hover:bg-indigo-600 transition-all active:scale-90"
+                          title={lang === 'zh' ? '替换节点' : 'Replace Node'}
+                        >
+                          <RefreshCw size={16} />
+                        </button>
+                        {showReplaceMenu === node.id && (
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-30 max-h-64 overflow-y-auto custom-scrollbar">
+                            {getReplaceableTools(node.id).length > 0 ? (
+                              getReplaceableTools(node.id).map(replaceTool => (
+                                <button
+                                  key={replaceTool.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    replaceNode(node.id, replaceTool.id);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-xs text-slate-300 hover:bg-indigo-500/20 hover:text-white transition-colors flex items-center gap-2"
+                                >
+                                  <div className="p-1 rounded bg-slate-700">
+                                    {React.createElement(getIcon(replaceTool.icon), { size: 12 })}
+                                  </div>
+                                  <span>{lang === 'zh' ? replaceTool.name_zh : replaceTool.name}</span>
+                                </button>
+                              ))
+                            ) : (
+                              <div className="px-4 py-3 text-xs text-slate-500 text-center">
+                                {lang === 'zh' ? '没有可替换的工具' : 'No replaceable tools'}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          deleteSelectedNode();
+                          setShowReplaceMenu(null);
+                        }}
+                        className="p-2 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition-all active:scale-90"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   )}
 
                   <div className={`px-4 py-3 border-b flex items-center justify-between bg-slate-800/40 rounded-t-3xl ${node.status === NodeStatus.RUNNING ? 'animate-pulse bg-indigo-500/10 border-indigo-500/20' : ''}`}>
@@ -2286,7 +2731,18 @@ Output ONLY the JSON, no additional text or markdown.`;
                                       {node.toolId === 'audio-input' ? <Volume2 size={12} className="text-indigo-400 shrink-0"/> : <VideoIcon size={12} className="text-indigo-400 shrink-0"/>}
                                       <span className="text-[8px] text-slate-400 truncate">Media File</span>
                                    </div>
-                                   <button onClick={() => updateNodeData(node.id, 'value', null)} className="p-1 text-slate-600 hover:text-red-400"><X size={10}/></button>
+                                   <div className="flex items-center gap-1">
+                                      {node.toolId === 'audio-input' && (
+                                        <button 
+                                          onClick={() => setShowAudioEditor(node.id)} 
+                                          className="p-1 text-slate-600 hover:text-indigo-400 transition-colors"
+                                          title={lang === 'zh' ? '编辑音频' : 'Edit Audio'}
+                                        >
+                                          <Edit3 size={10}/>
+                                        </button>
+                                      )}
+                                      <button onClick={() => updateNodeData(node.id, 'value', null)} className="p-1 text-slate-600 hover:text-red-400"><X size={10}/></button>
+                                   </div>
                                 </div>
                               ) : (
                                 <label className="flex items-center justify-center gap-2 w-full py-3 border border-dashed border-slate-700 rounded-xl cursor-pointer hover:border-indigo-500 hover:bg-indigo-500/5 transition-all">
@@ -2363,8 +2819,19 @@ Output ONLY the JSON, no additional text or markdown.`;
                               src={Array.isArray(nodeResult) ? nodeResult[0] : nodeResult} 
                               className="w-full h-full object-cover opacity-60 group-hover/thumb:opacity-100 transition-opacity" 
                               muted 
-                              onMouseOver={e => e.currentTarget.play()} 
-                              onMouseOut={e => e.currentTarget.pause()}
+                              preload="none"
+                              loading="lazy"
+                              onMouseOver={e => {
+                                const video = e.currentTarget;
+                                if (video.readyState < 2) {
+                                  video.load();
+                                }
+                                video.play().catch(() => {});
+                              }} 
+                              onMouseOut={e => {
+                                e.currentTarget.pause();
+                                e.currentTarget.currentTime = 0;
+                              }}
                             />
                             <div className="absolute inset-0 flex items-center justify-center text-white pointer-events-none group-hover/thumb:scale-125 transition-transform">
                                <Play size={24} className="drop-shadow-lg" fill="currentColor" />
@@ -3042,9 +3509,541 @@ Output ONLY the JSON, no additional text or markdown.`;
           </div>
         </div>
       )}
+
+      {/* Audio Editor Modal */}
+      {showAudioEditor && workflow && (() => {
+        const node = workflow.nodes.find(n => n.id === showAudioEditor);
+        if (!node || node.toolId !== 'audio-input' || !node.data.value) return null;
+        return (
+          <AudioEditorModal
+            nodeId={showAudioEditor}
+            audioData={node.data.value}
+            onClose={() => setShowAudioEditor(null)}
+            onSave={(trimmedAudio) => {
+              updateNodeData(showAudioEditor, 'value', trimmedAudio);
+              setShowAudioEditor(null);
+            }}
+            lang={lang}
+          />
+        );
+      })()}
     </div>
   );
 };
+
+// Audio Editor Modal Component
+const AudioEditorModal: React.FC<{
+  nodeId: string;
+  audioData: string;
+  onClose: () => void;
+  onSave: (trimmedAudio: string) => void;
+  lang: 'en' | 'zh';
+}> = ({ nodeId, audioData, onClose, onSave, lang }) => {
+  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
+  const [startTime, setStartTime] = useState(0);
+  const [endTime, setEndTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [waveformData, setWaveformData] = useState<number[]>([]);
+  const [draggingStart, setDraggingStart] = useState(false);
+  const [draggingEnd, setDraggingEnd] = useState(false);
+  const [trimmedAudioUrl, setTrimmedAudioUrl] = useState<string | null>(null);
+  const [trimmedDuration, setTrimmedDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const trimmedAudioRef = useRef<HTMLAudioElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const playbackBarRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    // Load audio and create buffer
+    const audio = new Audio(audioData);
+    audioRef.current = audio;
+    
+    const handleLoadedMetadata = () => {
+      const dur = audio.duration;
+      setDuration(dur);
+      setEndTime(dur);
+    };
+
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+      if (audio.currentTime >= endTime) {
+        audio.pause();
+        setIsPlaying(false);
+      }
+    };
+
+    const handleEnded = () => {
+      setIsPlaying(false);
+    };
+
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('ended', handleEnded);
+
+    // Load audio buffer for waveform
+    fetch(audioData)
+      .then(res => res.arrayBuffer())
+      .then(arrayBuffer => {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        return audioContext.decodeAudioData(arrayBuffer);
+      })
+      .then(buffer => {
+        setAudioBuffer(buffer);
+        // Generate waveform data
+        const samples = 200; // Number of bars in waveform
+        const sampleRate = buffer.sampleRate;
+        const samplesPerBar = Math.floor(buffer.length / samples);
+        const waveform: number[] = [];
+        
+        for (let i = 0; i < samples; i++) {
+          let sum = 0;
+          for (let j = 0; j < samplesPerBar; j++) {
+            const index = i * samplesPerBar + j;
+            if (index < buffer.length) {
+              const channelData = buffer.getChannelData(0);
+              sum += Math.abs(channelData[index]);
+            }
+          }
+          waveform.push(sum / samplesPerBar);
+        }
+        setWaveformData(waveform);
+      })
+      .catch(err => console.error('Failed to load audio buffer:', err));
+
+    return () => {
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('ended', handleEnded);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, [audioData]);
+
+  useEffect(() => {
+    // Draw waveform
+    if (!canvasRef.current || waveformData.length === 0 || duration === 0) return;
+    
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const barWidth = width / waveformData.length;
+    const maxAmplitude = Math.max(...waveformData, 0.001);
+
+    ctx.clearRect(0, 0, width, height);
+
+    waveformData.forEach((amplitude, index) => {
+      const barHeight = (amplitude / maxAmplitude) * height * 0.7;
+      const x = index * barWidth;
+      const y = (height - barHeight) / 2;
+      
+      // Highlight selected region
+      const timePerBar = duration / waveformData.length;
+      const barStartTime = index * timePerBar;
+      const barEndTime = (index + 1) * timePerBar;
+      
+      if (barStartTime >= startTime && barEndTime <= endTime) {
+        ctx.fillStyle = '#3b82f6'; // Blue for selected
+      } else {
+        ctx.fillStyle = '#d1d5db'; // Light gray for unselected
+      }
+      
+      ctx.fillRect(x, y, Math.max(1, barWidth - 1), barHeight);
+    });
+
+    // Draw current time indicator
+    if (isPlaying && duration > 0) {
+      const timeRatio = trimmedAudioUrl ? (currentTime / trimmedDuration) : (currentTime / duration);
+      const indicatorX = timeRatio * width;
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(indicatorX, 0);
+      ctx.lineTo(indicatorX, height);
+      ctx.stroke();
+    }
+
+    // Draw start/end markers with draggable handles
+    if (duration > 0 && !trimmedAudioUrl) {
+      const startX = (startTime / duration) * width;
+      const endX = (endTime / duration) * width;
+      
+      // Draw selected region background
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.15)';
+      ctx.fillRect(startX, 0, endX - startX, height);
+      
+      // Draw start handle
+      ctx.fillStyle = '#3b82f6';
+      ctx.fillRect(startX - 2, 0, 4, height);
+      // Draw handle circle
+      ctx.beginPath();
+      ctx.arc(startX, height / 2, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      
+      // Draw end handle
+      ctx.fillStyle = '#3b82f6';
+      ctx.fillRect(endX - 2, 0, 4, height);
+      // Draw handle circle
+      ctx.beginPath();
+      ctx.arc(endX, height / 2, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+  }, [waveformData, startTime, endTime, duration, isPlaying, currentTime, trimmedAudioUrl, trimmedDuration]);
+
+  const handlePlay = () => {
+    const audio = trimmedAudioUrl ? trimmedAudioRef.current : audioRef.current;
+    if (!audio) return;
+    
+    if (isPlaying) {
+      audio.pause();
+      setIsPlaying(false);
+    } else {
+      if (trimmedAudioUrl) {
+        audio.currentTime = 0;
+      } else {
+        audio.currentTime = startTime;
+      }
+      audio.play();
+      setIsPlaying(true);
+    }
+  };
+
+  // Handle playback for trimmed audio
+  useEffect(() => {
+    if (!trimmedAudioRef.current) return;
+    const audio = trimmedAudioRef.current;
+    
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+    };
+    
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    };
+    
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('ended', handleEnded);
+    
+    return () => {
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, [trimmedAudioUrl]);
+
+  const handleTrim = async () => {
+    if (!audioBuffer || startTime >= endTime) return;
+    
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const sampleRate = audioBuffer.sampleRate;
+      const startSample = Math.floor(startTime * sampleRate);
+      const endSample = Math.floor(endTime * sampleRate);
+      const length = endSample - startSample;
+      
+      if (length <= 0) {
+        alert(lang === 'zh' ? '请选择有效的剪辑范围' : 'Please select a valid trim range');
+        return;
+      }
+      
+      // Create new buffer with trimmed audio
+      const newBuffer = audioContext.createBuffer(
+        audioBuffer.numberOfChannels,
+        length,
+        sampleRate
+      );
+      
+      for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+        const oldData = audioBuffer.getChannelData(channel);
+        const newData = newBuffer.getChannelData(channel);
+        for (let i = 0; i < length; i++) {
+          newData[i] = oldData[startSample + i];
+        }
+      }
+      
+      // Convert to WAV
+      const wav = audioBufferToWav(newBuffer);
+      const base64 = arrayBufferToBase64(wav);
+      const dataUrl = `data:audio/wav;base64,${base64}`;
+      
+      // Set trimmed audio for preview
+      setTrimmedAudioUrl(dataUrl);
+      setTrimmedDuration(endTime - startTime);
+      setCurrentTime(0);
+      
+      // Don't close, allow user to preview trimmed audio
+      // onSave(dataUrl);
+      // onClose();
+    } catch (error: any) {
+      console.error('Failed to trim audio:', error);
+      alert(lang === 'zh' ? '剪辑失败: ' + error.message : 'Trim failed: ' + error.message);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current || duration === 0) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const width = rect.width;
+    const startX = (startTime / duration) * width;
+    const endX = (endTime / duration) * width;
+    
+    // Check if clicking on start handle (within 20px)
+    if (Math.abs(x - startX) < 20) {
+      setDraggingStart(true);
+      e.preventDefault();
+      return;
+    }
+    
+    // Check if clicking on end handle (within 20px)
+    if (Math.abs(x - endX) < 20) {
+      setDraggingEnd(true);
+      e.preventDefault();
+      return;
+    }
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!canvasRef.current || duration === 0) return;
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const ratio = Math.max(0, Math.min(1, x / rect.width));
+      const time = ratio * duration;
+      
+      if (draggingStart) {
+        setStartTime(Math.min(Math.max(0, time), endTime));
+        if (audioRef.current) {
+          audioRef.current.currentTime = time;
+        }
+      } else if (draggingEnd) {
+        setEndTime(Math.min(Math.max(time, startTime), duration));
+      }
+    };
+
+    const handleMouseUp = () => {
+      setDraggingStart(false);
+      setDraggingEnd(false);
+    };
+
+    if (draggingStart || draggingEnd) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [draggingStart, draggingEnd, duration, endTime, startTime]);
+
+  const handlePlaybackBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!playbackBarRef.current) return;
+    const rect = playbackBarRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const ratio = Math.max(0, Math.min(1, x / rect.width));
+    const audio = trimmedAudioUrl ? trimmedAudioRef.current : audioRef.current;
+    if (audio) {
+      if (trimmedAudioUrl) {
+        audio.currentTime = ratio * trimmedDuration;
+      } else {
+        audio.currentTime = startTime + ratio * (endTime - startTime);
+      }
+      setCurrentTime(audio.currentTime);
+    }
+  };
+
+  const displayDuration = trimmedAudioUrl ? trimmedDuration : duration;
+  const displayCurrentTime = trimmedAudioUrl ? currentTime : (currentTime - startTime);
+  const displayStartTime = trimmedAudioUrl ? 0 : startTime;
+  const displayEndTime = trimmedAudioUrl ? trimmedDuration : endTime;
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="px-8 py-6 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-semibold text-gray-900">{lang === 'zh' ? '音频剪辑' : 'Audio Editor'}</h2>
+            <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-100">
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+        
+        <div className="px-8 py-6 space-y-8">
+          {/* Waveform Track */}
+          <div className="space-y-3">
+            <div ref={containerRef} className="relative">
+              <canvas
+                ref={canvasRef}
+                width={800}
+                height={120}
+                onMouseDown={handleMouseDown}
+                className="w-full h-24 bg-gray-50 rounded-2xl border border-gray-200"
+                style={{ cursor: draggingStart || draggingEnd ? 'grabbing' : 'grab' }}
+              />
+            </div>
+            
+            {!trimmedAudioUrl && (
+              <div className="flex items-center justify-between text-xs text-gray-500 px-1">
+                <span>{formatTime(startTime)}</span>
+                <span className="text-gray-400">{formatTime(endTime - startTime)}</span>
+                <span>{formatTime(endTime)}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Playback Bar */}
+          <div className="space-y-2">
+            <div 
+              ref={playbackBarRef}
+              onClick={handlePlaybackBarClick}
+              className="relative h-2 bg-gray-200 rounded-full cursor-pointer overflow-hidden"
+            >
+              <div 
+                className="absolute h-full bg-blue-500 rounded-full transition-all"
+                style={{ width: `${displayDuration > 0 ? (displayCurrentTime / displayDuration) * 100 : 0}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span>{formatTime(displayCurrentTime)}</span>
+              <span>{formatTime(displayDuration)}</span>
+            </div>
+          </div>
+
+          {/* Hidden audio elements */}
+          {!trimmedAudioUrl && (
+            <audio ref={audioRef} src={audioData} />
+          )}
+          {trimmedAudioUrl && (
+            <audio ref={trimmedAudioRef} src={trimmedAudioUrl} />
+          )}
+
+          {/* Buttons */}
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+            <button
+              onClick={onClose}
+              className="px-6 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl font-medium transition-colors"
+            >
+              {lang === 'zh' ? '取消' : 'Cancel'}
+            </button>
+            
+            {trimmedAudioUrl ? (
+              <>
+                <button
+                  onClick={() => {
+                    setTrimmedAudioUrl(null);
+                    setTrimmedDuration(0);
+                    setCurrentTime(0);
+                    setIsPlaying(false);
+                  }}
+                  className="px-6 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl font-medium transition-colors"
+                >
+                  {lang === 'zh' ? '重新剪辑' : 'Re-edit'}
+                </button>
+                <button
+                  onClick={() => {
+                    if (trimmedAudioUrl) {
+                      onSave(trimmedAudioUrl);
+                      onClose();
+                    }
+                  }}
+                  className="px-6 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-medium transition-colors shadow-sm"
+                >
+                  {lang === 'zh' ? '保存' : 'Save'}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={handleTrim}
+                disabled={startTime >= endTime || Math.abs(endTime - startTime) < 0.1}
+                className="px-6 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-colors shadow-sm"
+              >
+                {lang === 'zh' ? '应用剪辑' : 'Apply Trim'}
+              </button>
+            )}
+            
+            <button
+              onClick={handlePlay}
+              className="px-6 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-medium transition-colors flex items-center gap-2"
+            >
+              {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+              {isPlaying ? (lang === 'zh' ? '暂停' : 'Pause') : (lang === 'zh' ? '播放' : 'Play')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Helper functions for audio processing
+function audioBufferToWav(buffer: AudioBuffer): ArrayBuffer {
+  const length = buffer.length;
+  const numberOfChannels = buffer.numberOfChannels;
+  const sampleRate = buffer.sampleRate;
+  const arrayBuffer = new ArrayBuffer(44 + length * numberOfChannels * 2);
+  const view = new DataView(arrayBuffer);
+  
+  const writeString = (offset: number, string: string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  };
+  
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + length * numberOfChannels * 2, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numberOfChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * numberOfChannels * 2, true);
+  view.setUint16(32, numberOfChannels * 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, 'data');
+  view.setUint32(40, length * numberOfChannels * 2, true);
+  
+  let offset = 44;
+  for (let i = 0; i < length; i++) {
+    for (let channel = 0; channel < numberOfChannels; channel++) {
+      const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      offset += 2;
+    }
+  }
+  
+  return arrayBuffer;
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
 
 // Clone Voice Modal Content Component
 const CloneVoiceModalContent: React.FC<{

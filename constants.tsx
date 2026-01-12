@@ -58,11 +58,15 @@ export const TOOLS: ToolDefinition[] = [
     category_zh: 'AI 模型',
     description: 'Advanced reasoning and generation with multiple text outputs',
     description_zh: '具备高级推理能力的大语言模型',
-    inputs: [{ id: 'in-text', type: DataType.TEXT, label: 'Prompt' }],
+    inputs: [
+      { id: 'in-text', type: DataType.TEXT, label: 'Prompt' },
+      { id: 'in-image', type: DataType.IMAGE, label: 'Image (Optional)' }
+    ],
     outputs: [], // Dynamically managed via node.data.customOutputs
     icon: 'Cpu',
     models: [
       { id: 'deepseek-v3-2-251201', name: 'DeepSeek V3.2' },
+      { id: 'doubao-1-5-vision-pro-32k-250115', name: 'Doubao Vision Pro' },
       { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro' },
       { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' }
     ]
@@ -226,5 +230,20 @@ export const TOOLS: ToolDefinition[] = [
       { id: 'wan2.2_animate', name: 'Wan 2.2 Animate' },
       { id: 'veo-3.1-fast-generate-preview', name: 'Veo 3.1 Fast' }
     ]
+  },
+  {
+    id: 'gemini-watermark-remover',
+    name: 'Gemini Watermark Remover',
+    name_zh: 'Gemini 图片水印去除',
+    category: 'Image Processing',
+    category_zh: '图像处理',
+    description: 'Remove watermarks from Gemini AI generated images using Reverse Alpha Blending',
+    description_zh: '使用反向 Alpha 混合算法去除 Gemini AI 生成图片的水印',
+    inputs: [
+      { id: 'in-image', type: DataType.IMAGE, label: 'Image with Watermark' }
+    ],
+    outputs: [{ id: 'out-image', type: DataType.IMAGE, label: 'Image without Watermark' }],
+    icon: 'Eraser',
+    models: []
   }
 ];
