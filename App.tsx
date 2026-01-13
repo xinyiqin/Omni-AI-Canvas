@@ -8,7 +8,7 @@ import {
   Terminal, MousePointer2, Wand2, Globe, Palette, Clapperboard, UserCircle, UserCog,
   Maximize, ZoomIn, ZoomOut, Zap, MessageSquare, PenTool, FileText, Star, Edit3, Boxes,
   Camera, Mic, Wand, ListPlus, Hash, Info, PlayCircle, FastForward, ArrowUpRight,
-  Target, Activity, History, Clock, Maximize2, DownloadCloud, BookOpen, ChevronLeft,
+  Target, Activity, History, Clock, Maximize2, DownloadCloud, BookOpen, ChevronLeft, ChevronDown, ChevronUp,
   Calendar, LayoutGrid, Sparkle, ToggleLeft, ToggleRight, Timer, PlayCircle as PlayIcon,
   Key, Globe2, Upload, Languages, ShieldCheck, TriangleAlert, SaveAll, Eraser
 } from 'lucide-react';
@@ -249,7 +249,7 @@ const PRESET_WORKFLOWS: WorkflowState[] = [
     ]
   },
   {
-    id: 'preset-ceo',
+    id: 'preset-s2v',
     name: '文字-数字人视频工作流',
     updatedAt: Date.now(),
     isDirty: false,
@@ -271,54 +271,56 @@ const PRESET_WORKFLOWS: WorkflowState[] = [
       { id: 'c7', sourceNodeId: 'node-chat', sourcePortId: 'avatar_video_prompt', targetNodeId: 'node-avatar', targetPortId: 'in-text' }
     ],
     nodes: [
-      { id: 'node-prompt', toolId: 'text-prompt', x: 100, y: 200, status: NodeStatus.IDLE, data: { value: "A man teach me not to sleep late in an overbearing CEO style." } },
+      { id: 'node-prompt', toolId: 'text-prompt', x: 100, y: 200, status: NodeStatus.IDLE, data: { value: "一只哈士奇程序员狗，戴着耳机和工卡在办公，吐槽自己的程序员日常。用一些网络热梗。" } },
       { id: 'node-chat', toolId: 'gemini-text', x: 450, y: 200, status: NodeStatus.IDLE, data: { 
           model: 'deepseek-v3-2-251201',
           mode: 'custom',
-          customInstruction: `You are a professional digital avatar video script writer. Your task is to create a complete script package for a digital avatar video based on the user's input description.
+          customInstruction: `你是一位专业的数字人视频脚本编写者。你的任务是根据用户的输入描述，为数字人视频创建完整的脚本包。
 
-CRITICAL: Generate high-quality, natural, and engaging content for a digital avatar video.
+重要提示：生成高质量、自然且引人入胜的数字人视频内容。
 
-For speech_text:
-- Write a natural, conversational script that sounds authentic when spoken
-- Keep it concise (20-40 seconds when spoken at normal pace)
-- Use clear, direct language that matches the character's personality and style
-- Ensure the script flows naturally and is easy to understand
-- Match the tone and energy described in the user's input
+对于 speech_text（语音文本）：
+- 编写自然、对话式的脚本，听起来真实可信
+- 保持简洁（正常语速下约20-40秒）
+- 使用清晰、直接的语言，符合角色的个性和风格
+- 确保脚本流畅自然，易于理解
+- 重要：不要在语音文本中使用括号、方括号或任何标记来表示语气或情感
+- 所有语气、情感和声音指令都应放在 'tone' 字段中，而不是 speech_text 中
+- 编写纯对话文本，不包含任何舞台指示或语气标记
 
-For tone:
-- Provide detailed voice acting instructions that capture the character's personality
-- Include emotional cues, pacing, emphasis points, and vocal characteristics
-- Describe how the voice should sound (e.g., warm, authoritative, friendly, serious)
-- Include specific moments where tone should shift or emphasize certain words/phrases
-- Make it actionable for TTS systems to produce natural-sounding speech
+对于 tone（语调指令）：
+- 提供详细的配音指导，捕捉角色的个性
+- 包含情感提示、节奏、重音点和声音特征
+- 描述声音应该听起来如何（例如：温暖、权威、友好、严肃）
+- 包含语气应该转换或强调某些词语/短语的具体时刻
+- 使其对TTS系统具有可操作性，以产生自然的声音
 
-For image_prompt:
-- Create a detailed portrait description that matches the character described
-- Include facial features, age, expression, clothing, background, lighting
-- Ensure the description is suitable for portrait image generation
-- Match the character's personality and style from the user's input
-- Include visual details that will make the avatar look professional and engaging
+对于 image_prompt（肖像提示）：
+- 创建与描述角色匹配的详细肖像描述
+- 包含面部特征、年龄、表情、服装、背景、光线
+- 确保描述适合肖像图像生成
+- 匹配用户输入中角色的个性和风格
+- 包含将使头像看起来专业且引人入胜的视觉细节
 
-For avatar_video_prompt:
-- Describe natural, realistic talking gestures and movements
-- Include head movements (nodding, tilting, slight turns)
-- Describe facial expressions that match the speech content and emotional tone
-- Include body language and hand gestures if appropriate
-- Specify eye contact and gaze direction
-- Ensure movements are synchronized with the speech rhythm
-- Make it detailed enough to guide the avatar video generation for natural, lifelike results
+对于 avatar_video_prompt（数字人视频动作提示）：
+- 描述自然、真实的说话手势和动作
+- 包含头部动作（点头、倾斜、轻微转动）
+- 描述与语音内容和情感语调匹配的面部表情
+- 如果合适，包含肢体语言和手势
+- 指定眼神接触和视线方向
+- 确保动作与语音节奏同步
+- 足够详细，以指导数字人视频生成自然、逼真的效果
 
-Output all four fields in JSON format.`,
+以JSON格式输出所有四个字段。`,
           customOutputs: [
-            { id: 'speech_text', label: 'Speech Script', description: 'The text the CEO says to the listener.' },
-            { id: 'tone', label: 'Tone Instruction', description: 'Cues for speech style (e.g. commanding, deep, protective).' },
-            { id: 'image_prompt', label: 'Portrait Prompt', description: 'Description of the overbearing CEO for an image generator.' },
-            { id: 'avatar_video_prompt', label: 'Avatar Video Action Prompt', description: 'Description of the avatar video action and movement (e.g. natural talking gestures, head movements, facial expressions).' }
+            { id: 'speech_text', label: '语音脚本', description: '人物对听众说的话。' },
+            { id: 'tone', label: '语调指令', description: '语音风格的提示。' },
+            { id: 'image_prompt', label: '肖像提示', description: '用于图像生成器的人物的肖像描述。' },
+            { id: 'avatar_video_prompt', label: '数字人视频动作提示', description: '数字人视频动作和运动的描述（例如：自然的说话手势、头部动作、面部表情）。' }
           ]
       } },
       { id: 'node-image', toolId: 'text-to-image', x: 850, y: 50, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-2512', aspectRatio: "9:16" } },
-      { id: 'node-tts', toolId: 'tts', x: 850, y: 350, status: NodeStatus.IDLE, data: { model: 'lightx2v', voiceType: 'zh_female_vv_uranus_bigtts', resourceId: 'seed-tts-2.0' } },
+      { id: 'node-tts', toolId: 'tts', x: 850, y: 350, status: NodeStatus.IDLE, data: { model: 'lightx2v', voiceType: 'zh_male_dayi_saturn_bigtts', resourceId: 'seed-tts-2.0' } },
       { id: 'node-avatar', toolId: 'avatar-gen', x: 1250, y: 200, status: NodeStatus.IDLE, data: {} }
     ]
   },
@@ -562,28 +564,28 @@ IMPORTANT: In each prompt, explicitly maintain consistency:
       { id: 'c33', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-8', targetPortId: 'in-image' },
       { id: 'c34', sourceNodeId: 'node-planner', sourcePortId: 'shot9_image_prompt', targetNodeId: 'node-i2i-9', targetPortId: 'in-text' },
       { id: 'c35', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-9', targetPortId: 'in-image' },
-      // Image-to-Image to Avatar Video (9 shots)
+      // Image-to-Image to Video Generation (shots 1, 2, 5, 6, 8, 9 -> avatar-gen; shots 3, 4, 7 -> video-gen-image)
       { id: 'c13', sourceNodeId: 'node-i2i-1', sourcePortId: 'out-image', targetNodeId: 'node-avatar-1', targetPortId: 'in-image' },
       { id: 'c14', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-1', targetPortId: 'in-audio' },
       { id: 'c15', sourceNodeId: 'node-planner', sourcePortId: 'shot1_video_prompt', targetNodeId: 'node-avatar-1', targetPortId: 'in-text' },
       { id: 'c16', sourceNodeId: 'node-i2i-2', sourcePortId: 'out-image', targetNodeId: 'node-avatar-2', targetPortId: 'in-image' },
       { id: 'c17', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-2', targetPortId: 'in-audio' },
       { id: 'c18', sourceNodeId: 'node-planner', sourcePortId: 'shot2_video_prompt', targetNodeId: 'node-avatar-2', targetPortId: 'in-text' },
-      { id: 'c19', sourceNodeId: 'node-i2i-3', sourcePortId: 'out-image', targetNodeId: 'node-avatar-3', targetPortId: 'in-image' },
-      { id: 'c20', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-3', targetPortId: 'in-audio' },
-      { id: 'c21', sourceNodeId: 'node-planner', sourcePortId: 'shot3_video_prompt', targetNodeId: 'node-avatar-3', targetPortId: 'in-text' },
-      { id: 'c22', sourceNodeId: 'node-i2i-4', sourcePortId: 'out-image', targetNodeId: 'node-avatar-4', targetPortId: 'in-image' },
-      { id: 'c23', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-4', targetPortId: 'in-audio' },
-      { id: 'c24', sourceNodeId: 'node-planner', sourcePortId: 'shot4_video_prompt', targetNodeId: 'node-avatar-4', targetPortId: 'in-text' },
+      // Shot 3 (Wide) - Image-to-Video
+      { id: 'c19', sourceNodeId: 'node-i2i-3', sourcePortId: 'out-image', targetNodeId: 'node-video-3', targetPortId: 'in-image' },
+      { id: 'c21', sourceNodeId: 'node-planner', sourcePortId: 'shot3_video_prompt', targetNodeId: 'node-video-3', targetPortId: 'in-text' },
+      // Shot 4 (Top-down) - Image-to-Video
+      { id: 'c22', sourceNodeId: 'node-i2i-4', sourcePortId: 'out-image', targetNodeId: 'node-video-4', targetPortId: 'in-image' },
+      { id: 'c24', sourceNodeId: 'node-planner', sourcePortId: 'shot4_video_prompt', targetNodeId: 'node-video-4', targetPortId: 'in-text' },
       { id: 'c25', sourceNodeId: 'node-i2i-5', sourcePortId: 'out-image', targetNodeId: 'node-avatar-5', targetPortId: 'in-image' },
       { id: 'c26', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-5', targetPortId: 'in-audio' },
       { id: 'c27', sourceNodeId: 'node-planner', sourcePortId: 'shot5_video_prompt', targetNodeId: 'node-avatar-5', targetPortId: 'in-text' },
       { id: 'c36', sourceNodeId: 'node-i2i-6', sourcePortId: 'out-image', targetNodeId: 'node-avatar-6', targetPortId: 'in-image' },
       { id: 'c37', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-6', targetPortId: 'in-audio' },
       { id: 'c38', sourceNodeId: 'node-planner', sourcePortId: 'shot6_video_prompt', targetNodeId: 'node-avatar-6', targetPortId: 'in-text' },
-      { id: 'c39', sourceNodeId: 'node-i2i-7', sourcePortId: 'out-image', targetNodeId: 'node-avatar-7', targetPortId: 'in-image' },
-      { id: 'c40', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-7', targetPortId: 'in-audio' },
-      { id: 'c41', sourceNodeId: 'node-planner', sourcePortId: 'shot7_video_prompt', targetNodeId: 'node-avatar-7', targetPortId: 'in-text' },
+      // Shot 7 (Extreme wide) - Image-to-Video
+      { id: 'c39', sourceNodeId: 'node-i2i-7', sourcePortId: 'out-image', targetNodeId: 'node-video-7', targetPortId: 'in-image' },
+      { id: 'c41', sourceNodeId: 'node-planner', sourcePortId: 'shot7_video_prompt', targetNodeId: 'node-video-7', targetPortId: 'in-text' },
       { id: 'c42', sourceNodeId: 'node-i2i-8', sourcePortId: 'out-image', targetNodeId: 'node-avatar-8', targetPortId: 'in-image' },
       { id: 'c43', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-8', targetPortId: 'in-audio' },
       { id: 'c44', sourceNodeId: 'node-planner', sourcePortId: 'shot8_video_prompt', targetNodeId: 'node-avatar-8', targetPortId: 'in-text' },
@@ -611,13 +613,13 @@ Generate 9 distinct camera shots:
 4. Shot 4 - Top-down shot (俯拍): Overhead or high-angle shot looking down at the character
 5. Shot 5 - Side angle (侧方位): Profile or 3/4 angle shot showing the character from the side
 6. Shot 6 - Low angle (仰拍): Low-angle shot looking up at the character, emphasizing power and presence
-7. Shot 7 - Dutch angle (倾斜角度): Tilted camera angle creating dynamic and energetic feel
+7. Shot 7 - Extreme wide shot (极大景): Very wide shot showing the character in a vast environment, emphasizing scale and atmosphere
 8. Shot 8 - Over-shoulder (过肩): Over-the-shoulder shot showing the character from behind, creating intimacy
 9. Shot 9 - Extreme close-up (极特写): Extreme close-up focusing on eyes, mouth, or specific facial features
 
 For each shot, generate:
 - shotN_image_prompt: Detailed image generation prompt that describes the character in that specific camera angle and framing, maintaining exact character consistency (same face, clothing, appearance). Include camera angle, framing, background, lighting, and character pose/expression.
-- shotN_video_prompt: Detailed video action description for the digital avatar, including singing gestures, head movements, body language, facial expressions, and movements that match the song's rhythm and energy.
+- shotN_video_prompt: For shots 1, 2, 5, 6, 8, 9 (digital avatar shots): Detailed video action description for the digital avatar, including singing gestures, head movements, body language, facial expressions, and movements that match the song's rhythm and energy. For shots 3, 4, 7 (image-to-video shots): Detailed video motion description including camera movement, scene dynamics, and visual effects that match the song's rhythm and energy.
 
 Output format: JSON with exactly these fields:
 - shot1_image_prompt, shot1_video_prompt
@@ -647,8 +649,8 @@ IMPORTANT:
             { id: 'shot5_video_prompt', label: 'Shot 5 Video Prompt', description: 'Side angle shot video action description' },
             { id: 'shot6_image_prompt', label: 'Shot 6 Image Prompt (Low angle)', description: 'Low-angle shot image description' },
             { id: 'shot6_video_prompt', label: 'Shot 6 Video Prompt', description: 'Low-angle shot video action description' },
-            { id: 'shot7_image_prompt', label: 'Shot 7 Image Prompt (Dutch angle)', description: 'Dutch angle shot image description' },
-            { id: 'shot7_video_prompt', label: 'Shot 7 Video Prompt', description: 'Dutch angle shot video action description' },
+            { id: 'shot7_image_prompt', label: 'Shot 7 Image Prompt (Extreme wide)', description: 'Extreme wide shot image description' },
+            { id: 'shot7_video_prompt', label: 'Shot 7 Video Prompt', description: 'Extreme wide shot video motion description' },
             { id: 'shot8_image_prompt', label: 'Shot 8 Image Prompt (Over-shoulder)', description: 'Over-shoulder shot image description' },
             { id: 'shot8_video_prompt', label: 'Shot 8 Video Prompt', description: 'Over-shoulder shot video action description' },
             { id: 'shot9_image_prompt', label: 'Shot 9 Image Prompt (Extreme close-up)', description: 'Extreme close-up shot image description' },
@@ -665,16 +667,126 @@ IMPORTANT:
       { id: 'node-i2i-7', toolId: 'image-to-image', x: 800, y: 650, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
       { id: 'node-i2i-8', toolId: 'image-to-image', x: 800, y: 750, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
       { id: 'node-i2i-9', toolId: 'image-to-image', x: 800, y: 850, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      // Avatar Video nodes (9 shots)
+      // Avatar Video nodes (shots 1, 2, 5, 6, 8, 9 - digital avatar)
       { id: 'node-avatar-1', toolId: 'avatar-gen', x: 1200, y: 50, status: NodeStatus.IDLE, data: {} },
       { id: 'node-avatar-2', toolId: 'avatar-gen', x: 1200, y: 150, status: NodeStatus.IDLE, data: {} },
-      { id: 'node-avatar-3', toolId: 'avatar-gen', x: 1200, y: 250, status: NodeStatus.IDLE, data: {} },
-      { id: 'node-avatar-4', toolId: 'avatar-gen', x: 1200, y: 350, status: NodeStatus.IDLE, data: {} },
       { id: 'node-avatar-5', toolId: 'avatar-gen', x: 1200, y: 450, status: NodeStatus.IDLE, data: {} },
       { id: 'node-avatar-6', toolId: 'avatar-gen', x: 1200, y: 550, status: NodeStatus.IDLE, data: {} },
-      { id: 'node-avatar-7', toolId: 'avatar-gen', x: 1200, y: 650, status: NodeStatus.IDLE, data: {} },
       { id: 'node-avatar-8', toolId: 'avatar-gen', x: 1200, y: 750, status: NodeStatus.IDLE, data: {} },
-      { id: 'node-avatar-9', toolId: 'avatar-gen', x: 1200, y: 850, status: NodeStatus.IDLE, data: {} }
+      { id: 'node-avatar-9', toolId: 'avatar-gen', x: 1200, y: 850, status: NodeStatus.IDLE, data: {} },
+      // Image-to-Video nodes (shots 3, 4, 7 - image-to-video)
+      { id: 'node-video-3', toolId: 'video-gen-image', x: 1200, y: 250, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'node-video-4', toolId: 'video-gen-image', x: 1200, y: 350, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'node-video-7', toolId: 'video-gen-image', x: 1200, y: 650, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } }
+    ]
+  },
+  {
+    id: 'preset-cinematic-oner',
+    name: '大师级运镜一镜到底视频工作流',
+    updatedAt: Date.now(),
+    isDirty: false,
+    isRunning: false,
+    env: {
+      lightx2v_url: "",
+      lightx2v_token: ""
+    },
+    globalInputs: {},
+    history: [],
+    showIntermediateResults: true,
+    connections: [
+      // Input to planner
+      { id: 'oner-c1', sourceNodeId: 'oner-node-desc', sourcePortId: 'out-text', targetNodeId: 'oner-node-planner', targetPortId: 'in-text' },
+      // Planner to image generation (5 cinematic shots)
+      { id: 'oner-c2', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot1_image_prompt', targetNodeId: 'oner-node-img-1', targetPortId: 'in-text' },
+      { id: 'oner-c3', sourceNodeId: 'oner-node-img-1', sourcePortId: 'out-image', targetNodeId: 'oner-node-img-2', targetPortId: 'in-image' },
+      { id: 'oner-c4', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot2_image_prompt', targetNodeId: 'oner-node-img-2', targetPortId: 'in-text' },
+      { id: 'oner-c5', sourceNodeId: 'oner-node-img-2', sourcePortId: 'out-image', targetNodeId: 'oner-node-img-3', targetPortId: 'in-image' },
+      { id: 'oner-c6', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot3_image_prompt', targetNodeId: 'oner-node-img-3', targetPortId: 'in-text' },
+      { id: 'oner-c7', sourceNodeId: 'oner-node-img-3', sourcePortId: 'out-image', targetNodeId: 'oner-node-img-4', targetPortId: 'in-image' },
+      { id: 'oner-c8', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot4_image_prompt', targetNodeId: 'oner-node-img-4', targetPortId: 'in-text' },
+      { id: 'oner-c9', sourceNodeId: 'oner-node-img-4', sourcePortId: 'out-image', targetNodeId: 'oner-node-img-5', targetPortId: 'in-image' },
+      { id: 'oner-c10', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot5_image_prompt', targetNodeId: 'oner-node-img-5', targetPortId: 'in-text' },
+      // Image to video generation
+      { id: 'oner-c11', sourceNodeId: 'oner-node-img-1', sourcePortId: 'out-image', targetNodeId: 'oner-node-video-1', targetPortId: 'in-image' },
+      { id: 'oner-c12', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot1_video_motion', targetNodeId: 'oner-node-video-1', targetPortId: 'in-text' },
+      { id: 'oner-c13', sourceNodeId: 'oner-node-img-2', sourcePortId: 'out-image', targetNodeId: 'oner-node-video-2', targetPortId: 'in-image' },
+      { id: 'oner-c14', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot2_video_motion', targetNodeId: 'oner-node-video-2', targetPortId: 'in-text' },
+      { id: 'oner-c15', sourceNodeId: 'oner-node-img-3', sourcePortId: 'out-image', targetNodeId: 'oner-node-video-3', targetPortId: 'in-image' },
+      { id: 'oner-c16', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot3_video_motion', targetNodeId: 'oner-node-video-3', targetPortId: 'in-text' },
+      { id: 'oner-c17', sourceNodeId: 'oner-node-img-4', sourcePortId: 'out-image', targetNodeId: 'oner-node-video-4', targetPortId: 'in-image' },
+      { id: 'oner-c18', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot4_video_motion', targetNodeId: 'oner-node-video-4', targetPortId: 'in-text' },
+      { id: 'oner-c19', sourceNodeId: 'oner-node-img-5', sourcePortId: 'out-image', targetNodeId: 'oner-node-video-5', targetPortId: 'in-image' },
+      { id: 'oner-c20', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot5_video_motion', targetNodeId: 'oner-node-video-5', targetPortId: 'in-text' }
+    ],
+    nodes: [
+      { id: 'oner-node-desc', toolId: 'text-prompt', x: 50, y: 400, status: NodeStatus.IDLE, data: { value: "一座未来主义赛博朋克城市的宏大全景，从高空俯瞰整座城市，镜头逐渐下降穿过云雾，掠过摩天大楼的玻璃幕墙，最终聚焦到繁华街道上的人群和霓虹灯" } },
+      { id: 'oner-node-planner', toolId: 'gemini-text', x: 350, y: 400, status: NodeStatus.IDLE, data: { 
+          model: 'deepseek-v3-2-251201',
+          mode: 'custom',
+          customInstruction: `你是一位专业的电影级视频分镜设计师。你的任务是根据用户的场景描述，设计一个"一镜到底"的连续运镜视频。
+
+重要原则：
+- 这是"一镜到底"视频，所有镜头必须形成连续、流畅的视觉过渡
+- 运用多种电影级运镜技巧：极远景、全景、中景、近景、特写、推拉镜头、跟随镜头、环绕镜头、升降镜头、俯仰镜头等
+- 场景必须宏大、震撼，具有视觉冲击力
+- 保持场景一致性和视觉连贯性（同一场景的不同视角）
+- 每个分镜的视觉风格、色调、氛围必须统一
+- 镜头运动要流畅自然，前后分镜要有逻辑连接
+
+输出要求：
+- 生成5个分镜，每个分镜包含：
+  - shotN_image_prompt: 详细的图像生成提示词，描述该分镜的画面内容、构图、光线、氛围
+  - shotN_video_motion: 详细的视频运动提示词，描述该分镜的相机运动、运镜方式、运动方向、速度
+
+分镜设计思路（参考）：
+- 分镜1: 极远景/全景 - 建立宏大场景，可能是高空俯瞰或全景展示
+- 分镜2: 中景/推拉 - 镜头逐渐接近，或从一侧移动到另一侧
+- 分镜3: 中景/跟随/环绕 - 镜头运动，展现场景的深度和细节
+- 分镜4: 近景/特写 - 聚焦到场景中的关键元素或细节
+- 分镜5: 全景/极远景收尾 - 回到宏大的视角，形成视觉闭环
+
+每个image_prompt应该：
+- 详细描述画面内容、构图（构图规则，如三分法、对称等）
+- 描述光线（自然光、人工光、色调、明暗对比）
+- 描述氛围和情绪
+- 保持场景元素的连贯性（如果是同一个场景，要描述相同的元素）
+
+每个video_motion应该：
+- 描述相机运动类型（推、拉、摇、移、跟、环绕、升降等）
+- 描述运动方向和路径
+- 描述运动速度（慢、中、快）
+- 描述相机角度（平视、俯视、仰视、斜角等）
+- 确保与下一个分镜的运动形成流畅过渡
+
+输出JSON格式，包含以下字段：
+- shot1_image_prompt, shot1_video_motion
+- shot2_image_prompt, shot2_video_motion
+- shot3_image_prompt, shot3_video_motion
+- shot4_image_prompt, shot4_video_motion
+- shot5_image_prompt, shot5_video_motion`,
+          customOutputs: [
+            { id: 'shot1_image_prompt', label: '分镜1图像提示', description: '第一分镜的详细图像生成提示词（远景/全景，建立宏大场景）' },
+            { id: 'shot1_video_motion', label: '分镜1运镜描述', description: '第一分镜的视频运动提示词（相机运动方式）' },
+            { id: 'shot2_image_prompt', label: '分镜2图像提示', description: '第二分镜的详细图像生成提示词（中景，镜头逐渐接近）' },
+            { id: 'shot2_video_motion', label: '分镜2运镜描述', description: '第二分镜的视频运动提示词' },
+            { id: 'shot3_image_prompt', label: '分镜3图像提示', description: '第三分镜的详细图像生成提示词（中景/跟随，展现深度）' },
+            { id: 'shot3_video_motion', label: '分镜3运镜描述', description: '第三分镜的视频运动提示词' },
+            { id: 'shot4_image_prompt', label: '分镜4图像提示', description: '第四分镜的详细图像生成提示词（近景/特写，聚焦细节）' },
+            { id: 'shot4_video_motion', label: '分镜4运镜描述', description: '第四分镜的视频运动提示词' },
+            { id: 'shot5_image_prompt', label: '分镜5图像提示', description: '第五分镜的详细图像生成提示词（全景收尾，视觉闭环）' },
+            { id: 'shot5_video_motion', label: '分镜5运镜描述', description: '第五分镜的视频运动提示词' }
+          ]
+      } },
+      { id: 'oner-node-img-1', toolId: 'text-to-image', x: 700, y: 100, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-2512', aspectRatio: "16:9" } },
+      { id: 'oner-node-img-2', toolId: 'image-to-image', x: 700, y: 250, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: "16:9" } },
+      { id: 'oner-node-img-3', toolId: 'image-to-image', x: 700, y: 400, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: "16:9" } },
+      { id: 'oner-node-img-4', toolId: 'image-to-image', x: 700, y: 550, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: "16:9" } },
+      { id: 'oner-node-img-5', toolId: 'image-to-image', x: 700, y: 700, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: "16:9" } },
+      { id: 'oner-node-video-1', toolId: 'video-gen-image', x: 1050, y: 100, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: "16:9" } },
+      { id: 'oner-node-video-2', toolId: 'video-gen-image', x: 1050, y: 250, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: "16:9" } },
+      { id: 'oner-node-video-3', toolId: 'video-gen-image', x: 1050, y: 400, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: "16:9" } },
+      { id: 'oner-node-video-4', toolId: 'video-gen-image', x: 1050, y: 550, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: "16:9" } },
+      { id: 'oner-node-video-5', toolId: 'video-gen-image', x: 1050, y: 700, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: "16:9" } }
     ]
   }
 ];
@@ -684,7 +796,7 @@ IMPORTANT:
 const App: React.FC = () => {
   const [lang, setLang] = useState<'en' | 'zh'>(() => {
     const saved = localStorage.getItem('omniflow_lang');
-    return (saved as any) || 'en';
+    return (saved as any) || 'zh';
   });
   const [currentView, setCurrentView] = useState<'DASHBOARD' | 'EDITOR'>('DASHBOARD');
   const [myWorkflows, setMyWorkflows] = useState<WorkflowState[]>([]);
@@ -703,6 +815,7 @@ const App: React.FC = () => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [ticker, setTicker] = useState(0);
   const [validationErrors, setValidationErrors] = useState<{ message: string; type: 'ENV' | 'INPUT' }[]>([]);
+  const [globalError, setGlobalError] = useState<{ message: string; details?: string } | null>(null);
   const [isEditingResult, setIsEditingResult] = useState(false);
   const [tempEditValue, setTempEditValue] = useState("");
   const [lightX2VVoiceList, setLightX2VVoiceList] = useState<{ voices?: any[]; emotions?: string[]; languages?: any[] } | null>(null);
@@ -722,6 +835,8 @@ const App: React.FC = () => {
   const isPausedRef = useRef(false);
   const [showReplaceMenu, setShowReplaceMenu] = useState<string | null>(null);
   const [showAudioEditor, setShowAudioEditor] = useState<string | null>(null); // nodeId of audio input being edited
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [resultsCollapsed, setResultsCollapsed] = useState(true); // Default collapsed
   
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -1734,11 +1849,11 @@ Output ONLY the JSON, no additional text or markdown.`;
       Object.entries(activeOutputs).forEach(([nodeId, val]) => {
         if (!nodesToRunIds.has(nodeId)) sessionOutputs[nodeId] = val;
       });
-      setActiveOutputs(prev => {
-        const next = { ...prev };
-        nodesToRunIds.forEach(id => delete next[id]);
-        return next;
-      });
+    setActiveOutputs(prev => {
+      const next = { ...prev };
+      nodesToRunIds.forEach(id => delete next[id]);
+      return next;
+    });
     } else {
       // Full workflow run: clear all outputs to prevent memory accumulation
       setActiveOutputs({});
@@ -1803,6 +1918,12 @@ Output ONLY the JSON, no additional text or markdown.`;
             try {
               const nodeInputs: Record<string, any> = {};
               tool.inputs.forEach(port => {
+                // Check if there's an override value for this port
+                if (node.data.inputOverrides && node.data.inputOverrides[port.id] !== undefined) {
+                  nodeInputs[port.id] = node.data.inputOverrides[port.id];
+                  return;
+                }
+                
                 const conns = incomingConns.filter(c => c.targetPortId === port.id);
                 if (conns.length > 0) {
                   const values = conns.map(c => {
@@ -2174,8 +2295,13 @@ Output ONLY the JSON, no additional text or markdown.`;
       // Limit history to 5 runs to reduce memory usage (was 10)
       setWorkflow(prev => prev ? ({ ...prev, history: [newRun, ...prev.history].slice(0, 5) }) : null);
       setSelectedRunId(newRun.id);
-    } catch (e) { 
-      console.error(e); 
+    } catch (e: any) { 
+      console.error('[Workflow] Execution error:', e);
+      const errorMessage = e?.message || e?.toString() || '工作流执行失败';
+      setGlobalError({ 
+        message: errorMessage,
+        details: e?.stack || (typeof e === 'string' ? e : JSON.stringify(e, null, 2))
+      });
       setSelectedRunId(null);
     } finally { 
       setWorkflow(prev => prev ? ({ ...prev, isRunning: false }) : null); 
@@ -2427,6 +2553,57 @@ Output ONLY the JSON, no additional text or markdown.`;
         </div>
       )}
 
+      {globalError && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setGlobalError(null)}>
+          <div className="bg-slate-900 border border-red-500/30 rounded-[32px] shadow-2xl shadow-red-500/10 max-w-2xl w-full overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 bg-red-500/10 border-b border-red-500/20 flex items-center gap-4">
+              <div className="p-3 bg-red-500 rounded-2xl text-white shadow-lg"><TriangleAlert size={20} /></div>
+              <div className="flex-1">
+                <h2 className="text-sm font-black uppercase tracking-widest text-white">{lang === 'zh' ? '发生错误' : 'Error Occurred'}</h2>
+                <p className="text-[10px] text-red-400/80 font-bold uppercase mt-1">{lang === 'zh' ? '应用遇到了一个未处理的错误' : 'An unhandled error occurred in the application'}</p>
+              </div>
+              <button onClick={() => setGlobalError(null)} className="p-2 text-slate-400 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex-1 p-6 overflow-y-auto max-h-[400px] custom-scrollbar space-y-4">
+              <div className="space-y-2">
+                <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{lang === 'zh' ? '错误信息' : 'Error Message'}</span>
+                <div className="p-3 bg-red-500/5 border border-red-500/10 rounded-xl text-sm text-red-400 leading-relaxed font-medium">
+                  {globalError.message}
+                </div>
+              </div>
+              {globalError.details && (
+                <div className="space-y-2">
+                  <details>
+                    <summary className="text-[10px] text-slate-500 font-black uppercase tracking-widest cursor-pointer hover:text-slate-400">
+                      {lang === 'zh' ? '详细信息' : 'Details'}
+                    </summary>
+                    <pre className="mt-2 p-3 bg-slate-950/50 border border-slate-800 rounded-xl text-xs text-slate-400 overflow-auto max-h-[200px] custom-scrollbar">
+                      {globalError.details}
+                    </pre>
+                  </details>
+                </div>
+              )}
+            </div>
+            <div className="p-4 bg-slate-800/20 border-t border-slate-800 flex justify-end gap-3">
+              <button 
+                onClick={() => setGlobalError(null)} 
+                className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+              >
+                {lang === 'zh' ? '关闭' : 'Close'}
+              </button>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+              >
+                {lang === 'zh' ? '刷新页面' : 'Reload Page'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {validationErrors.length > 0 && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
            <div className="bg-slate-900 border border-red-500/30 rounded-[32px] shadow-2xl shadow-red-500/10 max-w-md w-full overflow-hidden flex flex-col">
@@ -2473,6 +2650,69 @@ Output ONLY the JSON, no additional text or markdown.`;
           <div className="flex flex-col"><input value={workflow.name} onChange={e => { if (selectedRunId) setSelectedRunId(null); setWorkflow(p => p ? ({ ...p, name: e.target.value, isDirty: true }) : null); }} className="bg-transparent border-none text-base font-bold focus:ring-0 p-0 hover:bg-slate-800/20 rounded px-1 transition-colors w-64" /><span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">{t('editing_logic')}</span></div>
         </div>
         <div className="flex items-center gap-4">
+          {/* Zoom Controls */}
+          <div className="flex items-center gap-1 bg-slate-800/50 border border-slate-800 rounded-xl p-1">
+            <button 
+              onClick={() => {
+                const rect = canvasRef.current?.getBoundingClientRect();
+                if (rect) {
+                  const centerX = rect.width / 2;
+                  const centerY = rect.height / 2;
+                  const newZoom = Math.min(view.zoom * 1.2, 5);
+                  const zoomRatio = newZoom / view.zoom;
+                  setView({
+                    zoom: newZoom,
+                    x: centerX - (centerX - view.x) * zoomRatio,
+                    y: centerY - (centerY - view.y) * zoomRatio
+                  });
+                }
+              }}
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all"
+              title={lang === 'zh' ? '放大' : 'Zoom In'}
+            >
+              <ZoomIn size={14} />
+            </button>
+            <div className="px-2 py-1 text-[10px] font-bold text-slate-500 min-w-[3rem] text-center">
+              {Math.round(view.zoom * 100)}%
+            </div>
+            <button 
+              onClick={() => {
+                const rect = canvasRef.current?.getBoundingClientRect();
+                if (rect) {
+                  const centerX = rect.width / 2;
+                  const centerY = rect.height / 2;
+                  const newZoom = Math.max(view.zoom / 1.2, 0.1);
+                  const zoomRatio = newZoom / view.zoom;
+                  setView({
+                    zoom: newZoom,
+                    x: centerX - (centerX - view.x) * zoomRatio,
+                    y: centerY - (centerY - view.y) * zoomRatio
+                  });
+                }
+              }}
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all"
+              title={lang === 'zh' ? '缩小' : 'Zoom Out'}
+            >
+              <ZoomOut size={14} />
+            </button>
+            <button 
+              onClick={() => {
+                if (workflow && workflow.nodes.length > 0) {
+                  const nodes = workflow.nodes;
+                  const avgX = nodes.reduce((sum, n) => sum + n.x, 0) / nodes.length;
+                  const avgY = nodes.reduce((sum, n) => sum + n.y, 0) / nodes.length;
+                  setView({ x: -avgX + 400, y: -avgY + 300, zoom: 1 });
+                } else {
+                  setView({ x: 0, y: 0, zoom: 1 });
+                }
+              }}
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all"
+              title={lang === 'zh' ? '重置视图' : 'Reset View'}
+            >
+              <Maximize size={14} />
+            </button>
+          </div>
+          
           <button onClick={toggleLang} className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 hover:bg-slate-800 text-slate-400 rounded-xl text-[10px] font-bold transition-all border border-slate-800"><Languages size={12}/> {t('lang_name')}</button>
           {selectedRunId && (
             <div className="flex items-center gap-2 px-4 py-2 bg-indigo-500/20 rounded-xl border border-indigo-500/30 animate-pulse">
@@ -2507,19 +2747,90 @@ Output ONLY the JSON, no additional text or markdown.`;
       </header>
 
       <div className="flex-1 flex overflow-hidden relative">
-        <aside className="w-72 border-r border-slate-800/60 bg-slate-900/40 backdrop-blur-xl flex flex-col z-30 overflow-y-auto p-4 space-y-8">
-           <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">{t('tool_palette')}</h3>
-           {['Input', 'AI Model', 'Image Processing'].map(cat => (
-             <div key={cat} className="space-y-2.5">
-               <span className="text-[9px] text-slate-600 font-black uppercase">{lang === 'zh' ? (cat === 'Input' ? '输入' : cat === 'AI Model' ? 'AI 模型' : '图像处理') : cat}</span>
-               {TOOLS.filter(t => t.category === cat).map(tool => (
-                 <div key={tool.id} onClick={() => addNode(tool)} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-800/20 border border-slate-800/60 hover:border-indigo-500/40 hover:bg-slate-800/40 cursor-pointer transition-all active:scale-95 group"><div className="p-2.5 rounded-xl bg-slate-800 group-hover:bg-indigo-600 group-hover:text-white transition-colors">{React.createElement(getIcon(tool.icon), { size: 16 })}</div><div className="flex flex-col"><span className="text-xs font-bold text-slate-300">{lang === 'zh' ? tool.name_zh : tool.name}</span><span className="text-[9px] text-slate-500 line-clamp-1">{lang === 'zh' ? tool.description_zh : tool.description}</span></div></div>
-               ))}
+        <aside className={`${sidebarCollapsed ? 'w-0' : 'w-72'} border-r border-slate-800/60 bg-slate-900/40 backdrop-blur-xl flex flex-col z-30 overflow-hidden transition-all duration-300 relative`}>
+          <div className={`flex-1 overflow-y-auto p-4 space-y-8 ${sidebarCollapsed ? 'hidden' : ''}`}>
+             <div className="flex items-center justify-between mb-4">
+               <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{t('tool_palette')}</h3>
+               <button
+                 onClick={() => setSidebarCollapsed(true)}
+                 className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all"
+                 title={lang === 'zh' ? '收起' : 'Collapse'}
+               >
+                 <ChevronLeft size={14} />
+               </button>
              </div>
-           ))}
+             {['Input', 'AI Model', 'Image Processing'].map(cat => (
+               <div key={cat} className="space-y-2.5">
+                 <span className="text-[9px] text-slate-600 font-black uppercase">{lang === 'zh' ? (cat === 'Input' ? '输入' : cat === 'AI Model' ? 'AI 模型' : '图像处理') : cat}</span>
+                 {TOOLS.filter(t => t.category === cat).map(tool => (
+                   <div key={tool.id} onClick={() => addNode(tool)} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-800/20 border border-slate-800/60 hover:border-indigo-500/40 hover:bg-slate-800/40 cursor-pointer transition-all active:scale-95 group"><div className="p-2.5 rounded-xl bg-slate-800 group-hover:bg-indigo-600 group-hover:text-white transition-colors">{React.createElement(getIcon(tool.icon), { size: 16 })}</div><div className="flex flex-col"><span className="text-xs font-bold text-slate-300">{lang === 'zh' ? tool.name_zh : tool.name}</span><span className="text-[9px] text-slate-500 line-clamp-1">{lang === 'zh' ? tool.description_zh : tool.description}</span></div></div>
+                 ))}
+               </div>
+             ))}
+          </div>
+          {sidebarCollapsed && (
+            <button
+              onClick={() => setSidebarCollapsed(false)}
+              className="absolute left-0 top-1/2 -translate-y-1/2 p-2 bg-slate-800/80 hover:bg-slate-700 border-r border-slate-800/60 rounded-r-lg transition-all z-40"
+              title={lang === 'zh' ? '展开' : 'Expand'}
+            >
+              <ChevronRight size={14} className="text-slate-400" />
+            </button>
+          )}
         </aside>
 
-        <main ref={canvasRef} className="flex-1 relative overflow-hidden canvas-grid bg-[#0a0f1e]" onMouseMove={handleMouseMove} onMouseUp={() => { setDraggingNode(null); setConnecting(null); setIsPanning(false); }} onMouseDown={handleMouseDown} onWheel={e => { if (e.ctrlKey) { e.preventDefault(); setView(v => ({ ...v, zoom: Math.min(Math.max(v.zoom - e.deltaY * 0.001, 0.2), 2) })); } else setView(v => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY })); }}>
+        <main 
+          ref={canvasRef} 
+          className="flex-1 relative overflow-hidden canvas-grid bg-[#0a0f1e]" 
+          onMouseMove={handleMouseMove} 
+          onMouseUp={() => { setDraggingNode(null); setConnecting(null); setIsPanning(false); }} 
+          onMouseDown={handleMouseDown} 
+          onWheel={e => {
+            // Detect zoom gesture:
+            // 1. Ctrl/Cmd + wheel (desktop zoom)
+            // 2. Trackpad pinch (ctrlKey + deltaY on macOS)
+            // 3. Trackpad zoom gestures (deltaY with small deltaX, or when deltaY is much larger)
+            const isTrackpadPinch = e.ctrlKey || e.metaKey;
+            const isTrackpadZoom = !isTrackpadPinch && Math.abs(e.deltaY) > 0 && (Math.abs(e.deltaX) < 5 || Math.abs(e.deltaY) / Math.abs(e.deltaX) > 2);
+            const isZoom = isTrackpadPinch || isTrackpadZoom;
+            
+            if (isZoom) {
+              e.preventDefault();
+              
+              // Get mouse position relative to canvas
+              const rect = canvasRef.current?.getBoundingClientRect();
+              if (!rect) return;
+              
+              const mouseX = e.clientX - rect.left;
+              const mouseY = e.clientY - rect.top;
+              
+              // Calculate zoom factor - adjust sensitivity for trackpad vs mouse
+              let zoomFactor: number;
+              if (e.deltaMode === 0) {
+                // Pixel scrolling (trackpad or high-resolution mouse)
+                // Use smaller factor for smoother zoom
+                zoomFactor = 1 - (e.deltaY * 0.0008);
+              } else {
+                // Line/page scrolling (traditional mouse wheel)
+                zoomFactor = 1 - (e.deltaY * 0.01);
+              }
+              
+              const newZoom = Math.min(Math.max(view.zoom * zoomFactor, 0.1), 5);
+              
+              // Zoom towards mouse position (keep the point under cursor fixed)
+              const zoomRatio = newZoom / view.zoom;
+              setView(v => ({
+                zoom: newZoom,
+                x: mouseX - (mouseX - v.x) * zoomRatio,
+                y: mouseY - (mouseY - v.y) * zoomRatio
+              }));
+            } else {
+              // Pan with trackpad/wheel (when not zooming)
+              e.preventDefault();
+              setView(v => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }));
+            }
+          }}
+        >
           <div style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`, transformOrigin: '0 0', width: '100%', height: '100%' }}>
             <svg className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-visible">
               {workflow.connections.map(c => {
@@ -2597,8 +2908,8 @@ Output ONLY the JSON, no additional text or markdown.`;
                   {isSelected && (
                     <div className="absolute -top-14 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20 replace-menu-container">
                       <div className="relative">
-                        <button
-                          onMouseDown={(e) => e.stopPropagation()}
+                    <button
+                      onMouseDown={(e) => e.stopPropagation()}
                           onClick={(e) => { 
                             e.stopPropagation(); 
                             setShowReplaceMenu(showReplaceMenu === node.id ? null : node.id);
@@ -2642,9 +2953,9 @@ Output ONLY the JSON, no additional text or markdown.`;
                           setShowReplaceMenu(null);
                         }}
                         className="p-2 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition-all active:scale-90"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                    >
+                      <Trash2 size={16} />
+                    </button>
                     </div>
                   )}
 
@@ -2741,7 +3052,7 @@ Output ONLY the JSON, no additional text or markdown.`;
                                           <Edit3 size={10}/>
                                         </button>
                                       )}
-                                      <button onClick={() => updateNodeData(node.id, 'value', null)} className="p-1 text-slate-600 hover:text-red-400"><X size={10}/></button>
+                                   <button onClick={() => updateNodeData(node.id, 'value', null)} className="p-1 text-slate-600 hover:text-red-400"><X size={10}/></button>
                                    </div>
                                 </div>
                               ) : (
@@ -2798,26 +3109,26 @@ Output ONLY the JSON, no additional text or markdown.`;
                     <div 
                       onClick={(e) => { e.stopPropagation(); setExpandedOutput({ nodeId: node.id }); }}
                       onMouseDown={(e) => e.stopPropagation()}
-                      className="absolute -bottom-28 -right-4 w-32 h-24 bg-slate-800/95 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden cursor-pointer hover:scale-110 hover:border-indigo-500 transition-all z-30 group/thumb"
+                      className="absolute -right-36 top-0 max-w-32 max-h-32 bg-slate-800/95 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden cursor-pointer hover:scale-110 hover:border-indigo-500 transition-all z-30 group/thumb flex items-center justify-center"
                     >
                       {firstOutputType === DataType.IMAGE ? (
-                         <img src={Array.isArray(nodeResult) ? nodeResult[0] : nodeResult} className="w-full h-full object-cover" alt="Preview" />
+                         <img src={Array.isArray(nodeResult) ? nodeResult[0] : nodeResult} className="max-w-full max-h-full w-auto h-auto object-contain" alt="Preview" />
                       ) : firstOutputType === DataType.TEXT ? (
-                         <div className="p-3 text-[8px] text-slate-300 overflow-hidden leading-snug font-medium selection:bg-transparent">
+                         <div className="p-3 text-[8px] text-slate-300 overflow-hidden leading-snug font-medium selection:bg-transparent w-full h-full">
                             {typeof nodeResult === 'object' ? JSON.stringify(nodeResult).slice(0, 100) : nodeResult.toString().slice(0, 100)}...
                          </div>
                       ) : firstOutputType === DataType.AUDIO ? (
-                         <div className="w-full h-full flex flex-col items-center justify-center text-indigo-400 bg-indigo-500/5">
+                         <div className="w-full h-full flex flex-col items-center justify-center text-indigo-400 bg-indigo-500/5 min-w-32 min-h-24">
                             <Volume2 size={32} className="mb-1" />
                             <div className="w-20 h-1.5 bg-indigo-500/20 rounded-full overflow-hidden">
                                <div className="w-1/2 h-full bg-indigo-500 animate-pulse"></div>
                             </div>
                          </div>
                       ) : (
-                         <div className="w-full h-full relative bg-black group/video">
+                         <div className="w-full h-full relative bg-black group/video min-w-32 min-h-24 flex items-center justify-center">
                             <video 
                               src={Array.isArray(nodeResult) ? nodeResult[0] : nodeResult} 
-                              className="w-full h-full object-cover opacity-60 group-hover/thumb:opacity-100 transition-opacity" 
+                              className="max-w-full max-h-full w-auto h-auto object-contain opacity-60 group-hover/thumb:opacity-100 transition-opacity" 
                               muted 
                               preload="none"
                               loading="lazy"
@@ -3225,6 +3536,93 @@ Output ONLY the JSON, no additional text or markdown.`;
                       )}
                     </div>
                   )}
+                  
+                  {/* Show connected input fields from AI chat custom outputs */}
+                  {selectedNode && (() => {
+                    const tool = TOOLS.find(t => t.id === selectedNode.toolId);
+                    if (!tool) return null;
+                    
+                    const connectedInputs = tool.inputs
+                      .map(port => {
+                        const conn = workflow.connections.find(c => c.targetNodeId === selectedNode.id && c.targetPortId === port.id);
+                        if (!conn) return null;
+                        
+                        const sourceNode = workflow.nodes.find(n => n.id === conn.sourceNodeId);
+                        if (!sourceNode || sourceNode.toolId !== 'gemini-text' || !sourceNode.data.customOutputs) return null;
+                        
+                        // Check if sourcePortId is a custom output field
+                        const isCustomOutput = sourceNode.data.customOutputs.some((o: any) => o.id === conn.sourcePortId);
+                        if (!isCustomOutput) return null;
+                        
+                        // Get the field value from activeOutputs or sourceOutputs
+                        const sourceOutput = activeOutputs[conn.sourceNodeId] || sourceOutputs[conn.sourceNodeId];
+                        let fieldValue = '';
+                        if (sourceOutput && typeof sourceOutput === 'object' && conn.sourcePortId in sourceOutput) {
+                          fieldValue = typeof sourceOutput[conn.sourcePortId] === 'string' ? sourceOutput[conn.sourcePortId] : JSON.stringify(sourceOutput[conn.sourcePortId], null, 2);
+                        }
+                        
+                        // Get override value if exists
+                        const overrideValue = selectedNode.data.inputOverrides?.[port.id];
+                        const displayValue = overrideValue !== undefined ? (typeof overrideValue === 'string' ? overrideValue : JSON.stringify(overrideValue, null, 2)) : fieldValue;
+                        
+                        const fieldLabel = sourceNode.data.customOutputs.find((o: any) => o.id === conn.sourcePortId)?.label || conn.sourcePortId;
+                        
+                        return { port, conn, sourceNode, fieldLabel, displayValue, fieldValue, overrideValue };
+                      })
+                      .filter((item): item is NonNullable<typeof item> => item !== null);
+                    
+                    if (connectedInputs.length === 0) return null;
+                    
+                    return (
+                      <div className="space-y-4">
+                        <span className="text-[10px] text-slate-500 font-black uppercase flex items-center gap-2">
+                          <MessageSquare size={12} />
+                          {lang === 'zh' ? '连接的AI输出字段' : 'Connected AI Output Fields'}
+                        </span>
+                        {connectedInputs.map(({ port, conn, sourceNode, fieldLabel, displayValue, fieldValue, overrideValue }) => (
+                          <div key={port.id} className="p-4 bg-slate-950/40 border border-slate-800 rounded-[24px] space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex flex-col gap-1">
+                                <span className="text-[9px] font-black text-indigo-400 uppercase">{fieldLabel}</span>
+                                <span className="text-[8px] text-slate-500">
+                                  {lang === 'zh' ? '来自' : 'From'}: {lang === 'zh' ? TOOLS.find(t => t.id === sourceNode.toolId)?.name_zh : TOOLS.find(t => t.id === sourceNode.toolId)?.name} → {port.label}
+                                </span>
+                              </div>
+                              {overrideValue !== undefined && (
+                                <button
+                                  onClick={() => {
+                                    const newOverrides = { ...(selectedNode.data.inputOverrides || {}) };
+                                    delete newOverrides[port.id];
+                                    updateNodeData(selectedNode.id, 'inputOverrides', Object.keys(newOverrides).length > 0 ? newOverrides : undefined);
+                                  }}
+                                  className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"
+                                  title={lang === 'zh' ? '恢复原始值' : 'Restore original value'}
+                                >
+                                  <RefreshCw size={12} />
+                                </button>
+                              )}
+                            </div>
+                            <textarea
+                              value={displayValue}
+                              onChange={e => {
+                                const newOverrides = { ...(selectedNode.data.inputOverrides || {}) };
+                                newOverrides[port.id] = e.target.value;
+                                updateNodeData(selectedNode.id, 'inputOverrides', newOverrides);
+                              }}
+                              className="w-full h-32 bg-slate-900/50 border border-slate-800 rounded-xl p-3 text-[10px] text-slate-300 resize-none focus:border-indigo-500 focus:ring-0 transition-all font-mono"
+                              placeholder={lang === 'zh' ? '编辑字段内容...' : 'Edit field content...'}
+                            />
+                            {overrideValue !== undefined && (
+                              <div className="flex items-center gap-2 text-[8px] text-amber-400">
+                                <AlertCircle size={10} />
+                                <span>{lang === 'zh' ? '已修改，将使用此值覆盖连接的值' : 'Modified: This value will override the connected value'}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
              </div>
            ) : (
@@ -3291,33 +3689,47 @@ Output ONLY the JSON, no additional text or markdown.`;
         </aside>
       </div>
 
-      <footer className="h-80 border-t border-slate-800/60 bg-slate-900/60 backdrop-blur-3xl z-40 flex flex-col overflow-hidden">
+      <footer className={`${resultsCollapsed ? 'h-12' : 'h-80'} border-t border-slate-800/60 bg-slate-900/60 backdrop-blur-3xl z-40 flex flex-col overflow-hidden transition-all duration-300`}>
         <div className="px-8 py-4 border-b border-slate-800/60 flex items-center justify-between">
            <div className="flex items-center gap-6">
-              <h2 className="text-[10px] font-black uppercase tracking-[0.3em] flex items-center gap-4 text-indigo-400"><History size={16}/> {t('execution_results')}</h2>
-              <div className="h-4 w-px bg-slate-800"></div>
-              <button 
-                onClick={() => setWorkflow(p => p ? ({ ...p, showIntermediateResults: !p.showIntermediateResults }) : null)}
-                className="flex items-center gap-2 text-[9px] font-black uppercase text-slate-400 hover:text-indigo-300 transition-all"
+              <button
+                onClick={() => setResultsCollapsed(!resultsCollapsed)}
+                className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400 hover:text-indigo-300 transition-all"
               >
-                {workflow.showIntermediateResults ? <ToggleRight size={16} className="text-indigo-500" /> : <ToggleLeft size={16} />}
-                {t('show_intermediate')}
+                <History size={16}/>
+                {t('execution_results')}
+                {resultsCollapsed ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               </button>
+              {!resultsCollapsed && (
+                <>
+                  <div className="h-4 w-px bg-slate-800"></div>
+                  <button 
+                    onClick={() => setWorkflow(p => p ? ({ ...p, showIntermediateResults: !p.showIntermediateResults }) : null)}
+                    className="flex items-center gap-2 text-[9px] font-black uppercase text-slate-400 hover:text-indigo-300 transition-all"
+                  >
+                    {workflow.showIntermediateResults ? <ToggleRight size={16} className="text-indigo-500" /> : <ToggleLeft size={16} />}
+                    {t('show_intermediate')}
+                  </button>
+                </>
+              )}
            </div>
-           <div className="flex gap-4">
-             {workflow.history.map(r => (
-               <button key={r.id} onClick={() => setSelectedRunId(r.id)} className={`group relative px-4 py-1.5 rounded-full text-[9px] font-bold border transition-all ${selectedRunId === r.id ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
-                 {new Date(r.timestamp).toLocaleTimeString()}
-                 {r.totalTime !== undefined && (
-                   <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 text-[8px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-xl">
-                      {t('run_time')}: {formatTime(r.totalTime)}
-                   </span>
-                 )}
-               </button>
-             ))}
-             {selectedRunId && <button onClick={() => setSelectedRunId(null)} className="p-1.5 text-slate-500 hover:text-white transition-all active:scale-90"><RefreshCw size={14}/></button>}
-           </div>
+           {!resultsCollapsed && (
+             <div className="flex gap-4">
+               {workflow.history.map(r => (
+                 <button key={r.id} onClick={() => setSelectedRunId(r.id)} className={`group relative px-4 py-1.5 rounded-full text-[9px] font-bold border transition-all ${selectedRunId === r.id ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
+                   {new Date(r.timestamp).toLocaleTimeString()}
+                   {r.totalTime !== undefined && (
+                     <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 text-[8px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-xl">
+                        {t('run_time')}: {formatTime(r.totalTime)}
+                     </span>
+                   )}
+                 </button>
+               ))}
+               {selectedRunId && <button onClick={() => setSelectedRunId(null)} className="p-1.5 text-slate-500 hover:text-white transition-all active:scale-90"><RefreshCw size={14}/></button>}
+             </div>
+           )}
         </div>
+        {!resultsCollapsed && (
         <div className="flex-1 overflow-x-auto p-8 flex gap-8 items-start custom-scrollbar">
            {activeResultsList.length === 0 && !workflow.isRunning ? (
              <div className="flex-1 flex flex-col items-center justify-center opacity-10 animate-pulse"><RefreshCw size={48} className="mb-4 animate-spin-slow"/><span className="text-[10px] font-black uppercase tracking-widest">{t('awaiting_execution')}</span></div>
@@ -3397,6 +3809,7 @@ Output ONLY the JSON, no additional text or markdown.`;
              );
            })}
         </div>
+        )}
       </footer>
       <style>{`
         @keyframes marching-ants { from { stroke-dashoffset: 40; } to { stroke-dashoffset: 0; } }
