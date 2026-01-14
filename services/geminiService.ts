@@ -196,29 +196,70 @@ export const lightX2VTask = async (
   task: string,
   modelCls: string,
   prompt: string,
-  inputImage?: string,
+  inputImage?: string | string[],
   inputAudio?: string,
   lastFrame?: string,
   outputName = "output_video",
   aspectRatio?: string,
-  inputVideo?: string
+  inputVideo?: string,
+  onTaskId?: (taskId: string) => void,
+  abortSignal?: AbortSignal
 ): Promise<string> => {
   if (!baseUrl || !baseUrl.trim()) throw new Error("Base URL is required for LightX2V");
   if (!token || !token.trim()) throw new Error("Access Token is required for LightX2V");
 
-  const formatMediaPayload = (val: string | undefined, isAudio = false) => {
+  const formatMediaPayload = (val: string | string[] | undefined, isAudio = false) => {
     if (!val) return undefined;
     
-    // Determine type (url or base64)
-    const isUrl = val.startsWith('http');
+    // Handle multiple images (array) - for i2i tasks with multiple input images
+    // According to lightx2v server (utils.py:177-185), server expects:
+    // - For base64: list of base64 strings (may include data:image prefix)
+    // - Server will decode each and save as input_image_1, input_image_2, etc.
+    if (Array.isArray(val) && val.length > 0) {
+      // Process each image: extract base64 from data URLs, keep URLs as-is
+      const processedImages = val.map(img => {
+        if (typeof img !== 'string') return img;
+        if (img.startsWith('http')) {
+          // URL - server will fetch it via fetch_resource
+          return img;
+        } else {
+          // Base64 - extract base64 part if it's a data URL (data:image/...;base64,...)
+          // Server code checks for "data:image" prefix and splits on ","
+          if (img.startsWith('data:image')) {
+            return img.split(',')[1];
+          } else if (img.includes(',')) {
+            // Handle other data URL formats
+            return img.split(',')[1];
+          } else {
+            // Already pure base64
+            return img;
+          }
+        }
+      });
+      
+      // Server expects: { type: "base64", data: ["base64string1", "base64string2", ...] }
+      // OR { type: "url", data: ["url1", "url2", ...] }
+      // Note: Server's preload_data handles list by checking if first item starts with "data:image"
+      // For consistency, if any item is a URL, we should use type "url" for all
+      // But server code suggests it expects base64 list, so we'll use base64 for mixed arrays
+      // and let server handle URL fetching if needed
+      const hasUrl = processedImages.some(img => typeof img === 'string' && img.startsWith('http'));
+      const type = hasUrl ? "url" : "base64";
+      
+      return { type: type, data: processedImages };
+    }
+    
+    // Single value handling (original logic)
+    const singleVal = val as string;
+    const isUrl = singleVal.startsWith('http');
     const type = isUrl ? "url" : "base64";
     
     // Process the data content
-    let dataContent = val;
+    let dataContent = singleVal;
     if (!isUrl) {
-      dataContent = val.includes(',') ? val.split(',')[1] : val;
+      dataContent = singleVal.includes(',') ? singleVal.split(',')[1] : singleVal;
       // Special handling for raw PCM audio from Gemini
-      if (isAudio && !val.startsWith('data:')) {
+      if (isAudio && !singleVal.startsWith('data:')) {
         dataContent = wrapPcmInWav(dataContent, 24000);
       }
     }
@@ -1101,6 +1142,162 @@ export const doubaoText = async (
 
   const data = await response.json();
   const text = data.choices?.[0]?.message?.content || "";
+
+  if (hasMultipleOutputs) {
+    try {
+      const parsed = JSON.parse(text);
+      outputKeys.forEach(key => { if (!(key in parsed)) parsed[key] = "..."; });
+      return parsed;
+    } catch (e) {
+      const fallback: Record<string, string> = {};
+      outputKeys.forEach((key, i) => fallback[key] = i === 0 ? text : "...");
+      return fallback;
+    }
+  }
+
+  return text;
+};
+
+/**
+ * PP Chat Gemini API Integration
+ * Uses the PP Chat API endpoint for chat completions (custom Gemini endpoint)
+ * Supports both text and image inputs
+ */
+export const ppchatGeminiText = async (
+  prompt: string,
+  mode = 'basic',
+  customInstruction?: string,
+  model = 'gemini-3-pro-preview',
+  outputFields?: OutputField[],
+  imageInput?: string | string[] | any[]
+): Promise<any> => {
+  const apiKey = process.env.PPCHAT_API_KEY;
+  if (!apiKey) {
+    throw new Error("PP Chat API key is required. Please set PPCHAT_API_KEY environment variable.");
+  }
+
+  // Ensure prompt is a string
+  const promptStr = typeof prompt === 'string' ? prompt : String(prompt || '');
+
+  const systemInstructions: Record<string, string> = {
+    basic: "You are a helpful and versatile AI assistant. Provide clear, accurate, and direct answers.",
+    enhance: "You are a Prompt Engineering Expert. Enhance the user's input into a detailed prompt. Output ONLY the enhanced prompt.",
+    enhance_image: "Expand the user's input into a highly detailed image generation prompt. Output ONLY the prompt.",
+    enhance_video: "Expand the user's input into a cinematic video prompt. Describe camera and lighting. Output ONLY the prompt.",
+    enhance_tts: "Transform the input into a natural narration script. Output ONLY the text.",
+    summarize: "Extract core info into a concise summary.",
+    polish: "Refine text for clarity and tone.",
+  };
+
+  const baseInstruction = mode === 'custom' && customInstruction 
+    ? customInstruction 
+    : (systemInstructions[mode] || systemInstructions.basic);
+
+  const hasMultipleOutputs = outputFields && outputFields.length > 0;
+  const outputKeys = outputFields?.map(f => f.id) || [];
+
+  // Build parts array - support both text and images
+  const parts: any[] = [];
+
+  // Add images if provided
+  if (imageInput) {
+    const images = Array.isArray(imageInput) ? imageInput : [imageInput];
+    const flatImages = images.flat().filter(img => img && typeof img === 'string');
+    flatImages.forEach(img => {
+      // Extract base64 data and mime type from data URL or base64 string
+      let base64Data: string;
+      let mimeType: string = 'image/jpeg';
+
+      if (img.startsWith('data:')) {
+        // Data URL format: data:image/jpeg;base64,/9j/4AAQ...
+        const matches = img.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          mimeType = matches[1] || 'image/jpeg';
+          base64Data = matches[2];
+        } else {
+          // Fallback: try to extract base64 from data URL without explicit mime type
+          const base64Match = img.match(/base64,(.+)$/);
+          base64Data = base64Match ? base64Match[1] : img;
+        }
+      } else if (img.startsWith('http')) {
+        // If it's a URL, we need to fetch it first (for now, skip URLs)
+        // In a production environment, you might want to fetch and convert
+        return;
+      } else {
+        // Assume it's already base64
+        base64Data = img;
+      }
+
+      parts.push({
+        inline_data: {
+          mime_type: mimeType,
+          data: base64Data
+        }
+      });
+    });
+  }
+
+  // Add text content
+  const textContent = hasMultipleOutputs
+    ? `${promptStr}\n\nIMPORTANT: You MUST generate content for each field as JSON: ${outputKeys.join(', ')}.`
+    : promptStr;
+
+  if (textContent) {
+    parts.push({ text: textContent });
+  }
+
+  // Build request body
+  const requestBody: any = {
+    contents: [{
+      parts: parts
+    }]
+  };
+
+  // Add system instruction if needed
+  if (baseInstruction && mode !== 'basic') {
+    requestBody.systemInstruction = {
+      parts: [{ text: baseInstruction }]
+    };
+  }
+
+  // Add instruction for multiple outputs if needed
+  if (hasMultipleOutputs) {
+    requestBody.generationConfig = {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "object",
+        properties: (outputFields || []).reduce((acc, field) => ({
+          ...acc,
+          [field.id]: { type: "string", description: field.description || field.id }
+        }), {}),
+        required: outputKeys
+      }
+    };
+  }
+
+  const response = await fetch(`https://api.ppchat.vip/v1beta/models/${model}:generateContent`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey
+    },
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!response.ok) {
+    let errorMessage = `PP Chat API failed (${response.status})`;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.error?.message || errorData.error || errorMessage;
+    } catch (e) {
+      const errorText = await response.text();
+      errorMessage = errorText || errorMessage;
+    }
+    throw new Error(errorMessage);
+  }
+
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
   if (hasMultipleOutputs) {
     try {

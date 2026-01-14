@@ -1,6 +1,53 @@
 
 import { ToolDefinition, DataType } from './types';
 
+/**
+ * Check if an environment variable is set (non-empty)
+ * Vite replaces process.env.XXX with JSON.stringify(value) at build time
+ * - If env var is set: becomes "actual-value"
+ * - If env var is not set and has || '': becomes ""
+ * - If env var is not set without || '': becomes "undefined" (string)
+ */
+const hasEnvVar = (key: string): boolean => {
+  try {
+    // @ts-ignore - process.env is defined by Vite's define config
+    const value = process.env[key];
+    // Check if value exists, is not empty, and is not the string "undefined"
+    return typeof value === 'string' && value.trim() !== '' && value !== 'undefined';
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Get the filtered models based on available API keys
+ */
+const getFilteredModels = (models: Array<{ id: string; name: string }>): Array<{ id: string; name: string }> => {
+  return models.filter(model => {
+    // Map model IDs to their required environment variables
+    const modelEnvMap: Record<string, string[]> = {
+      'gemini-3-pro-preview': ['GEMINI_API_KEY', 'API_KEY'],
+      'gemini-3-flash-preview': ['GEMINI_API_KEY', 'API_KEY'],
+      'gemini-2.5-flash-image': ['GEMINI_API_KEY', 'API_KEY'],
+      'gemini-2.5-flash-preview-tts': ['GEMINI_API_KEY', 'API_KEY'],
+      'deepseek-v3-2-251201': ['DEEPSEEK_API_KEY'],
+      'doubao-1-5-vision-pro-32k-250115': ['DEEPSEEK_API_KEY'],
+      'ppchat-gemini-2.5-pro': ['PPCHAT_API_KEY'],
+      'ppchat-gemini-3-pro-preview': ['PPCHAT_API_KEY'],
+      'lightx2v': ['LIGHTX2V_TOKEN'],
+    };
+
+    const requiredEnvVars = modelEnvMap[model.id];
+    if (!requiredEnvVars) {
+      // If model is not in the map, show it by default (e.g., LightX2V models that don't need API keys)
+      return true;
+    }
+
+    // Check if at least one of the required env vars is set
+    return requiredEnvVars.some(key => hasEnvVar(key));
+  });
+};
+
 export const TOOLS: ToolDefinition[] = [
   {
     id: 'text-prompt',
@@ -64,12 +111,14 @@ export const TOOLS: ToolDefinition[] = [
     ],
     outputs: [], // Dynamically managed via node.data.customOutputs
     icon: 'Cpu',
-    models: [
+    models: getFilteredModels([
       { id: 'deepseek-v3-2-251201', name: 'DeepSeek V3.2' },
       { id: 'doubao-1-5-vision-pro-32k-250115', name: 'Doubao Vision Pro' },
+      { id: 'ppchat-gemini-2.5-pro', name: 'PP Chat Gemini 2.5 Pro' },
+      { id: 'ppchat-gemini-3-pro-preview', name: 'PP Chat Gemini 3 Pro' },
       { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro' },
       { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' }
-    ]
+    ])
   },
   {
     id: 'text-to-image',
@@ -82,10 +131,10 @@ export const TOOLS: ToolDefinition[] = [
     inputs: [{ id: 'in-text', type: DataType.TEXT, label: 'Prompt' }],
     outputs: [{ id: 'out-image', type: DataType.IMAGE, label: 'Image' }],
     icon: 'Sparkles',
-    models: [
+    models: getFilteredModels([
       { id: 'Qwen-Image-2512', name: 'LightX2V (Qwen Image 2.5)' },
       { id: 'gemini-2.5-flash-image', name: 'Gemini (Flash Image)' }
-    ]
+    ])
   },
   {
     id: 'image-to-image',
@@ -101,10 +150,10 @@ export const TOOLS: ToolDefinition[] = [
     ],
     outputs: [{ id: 'out-image', type: DataType.IMAGE, label: 'Result' }],
     icon: 'Palette',
-    models: [
+    models: getFilteredModels([
       { id: 'Qwen-Image-Edit-2511', name: 'LightX2V (Qwen Image Edit)' },
       { id: 'gemini-2.5-flash-image', name: 'Gemini (Flash Image)' }
-    ]
+    ])
   },
   {
     id: 'tts',
@@ -120,10 +169,10 @@ export const TOOLS: ToolDefinition[] = [
     ],
     outputs: [{ id: 'out-audio', type: DataType.AUDIO, label: 'Audio' }],
     icon: 'Volume2',
-    models: [
+    models: getFilteredModels([
       { id: 'lightx2v', name: 'LightX2V TTS' },
       { id: 'gemini-2.5-flash-preview-tts', name: 'Gemini 2.5 TTS' }
-    ]
+    ])
   },
   {
     id: 'lightx2v-voice-clone',

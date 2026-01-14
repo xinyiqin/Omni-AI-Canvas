@@ -17,18 +17,19 @@ import {
   WorkflowNode, Connection, WorkflowState, 
   NodeStatus, DataType, Port, ToolDefinition, GenerationRun
 } from './types';
-import { geminiText, geminiImage, geminiSpeech, geminiVideo, lightX2VTask, lightX2VTTS, lightX2VVoiceClone, lightX2VVoiceCloneTTS, lightX2VGetVoiceList, lightX2VGetCloneVoiceList, deepseekText, doubaoText } from './services/geminiService';
+import { geminiText, geminiImage, geminiSpeech, geminiVideo, lightX2VTask, lightX2VTTS, lightX2VVoiceClone, lightX2VVoiceCloneTTS, lightX2VGetVoiceList, lightX2VGetCloneVoiceList, deepseekText, doubaoText, ppchatGeminiText } from './services/geminiService';
 import { removeGeminiWatermark } from './services/watermarkRemover';
+import { PRESET_WORKFLOWS } from './preset_workflow';
 
 // --- Localization ---
 
 const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
-    app_name: 'OmniFlow',
-    app_subtitle: 'Multi-Modal Lab',
+    app_name: ' LightX2V OmniFlow',
+    app_subtitle: 'Multi-Modal Automation',
     create_workflow: 'Create Workflow',
     my_workflows: 'My Workflows',
-    preset_library: 'Preset Library',
+    preset_library: 'Preset Workflows',
     no_workflows: 'No Workflows Saved',
     system_preset: 'System Preset',
     editing_logic: 'Editing Logic',
@@ -84,11 +85,11 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     manual_edit_hint: 'Directly modify the generated content below. Changes will be used by connected nodes.'
   },
   zh: {
-    app_name: 'OmniFlow',
-    app_subtitle: '多模态实验室',
+    app_name: 'LightX2V OmniFlow',
+    app_subtitle: '多模态自动化创作',
     create_workflow: '新建工作流',
     my_workflows: '我的工作流',
-    preset_library: '预设库',
+    preset_library: '预设工作流',
     no_workflows: '暂无保存的工作流',
     system_preset: '系统预设',
     editing_logic: '逻辑编辑',
@@ -207,589 +208,6 @@ const downloadFile = (content: string, fileName: string, type: DataType) => {
   document.body.removeChild(link);
 };
 
-// --- Presets Data ---
-
-const PRESET_WORKFLOWS: WorkflowState[] = [
-  {
-    id: 'preset-morph',
-    name: '文字-首尾帧生视频工作流',
-    updatedAt: Date.now(),
-    isDirty: false,
-    isRunning: false,
-    env: {
-      lightx2v_url: "",
-      lightx2v_token: ""
-    },
-    globalInputs: {},
-    history: [],
-    showIntermediateResults: true,
-    connections: [
-      { id: 'c1', sourceNodeId: 'node-input', sourcePortId: 'out-text', targetNodeId: 'node-planner', targetPortId: 'in-text' },
-      { id: 'c2', sourceNodeId: 'node-planner', sourcePortId: 'start_img_prompt', targetNodeId: 'node-start-frame', targetPortId: 'in-text' },
-      { id: 'c3', sourceNodeId: 'node-start-frame', sourcePortId: 'out-image', targetNodeId: 'node-end-frame', targetPortId: 'in-image' },
-      { id: 'c4', sourceNodeId: 'node-planner', sourcePortId: 'end_img_prompt', targetNodeId: 'node-end-frame', targetPortId: 'in-text' },
-      { id: 'c5', sourceNodeId: 'node-start-frame', sourcePortId: 'out-image', targetNodeId: 'node-video', targetPortId: 'in-image-start' },
-      { id: 'c6', sourceNodeId: 'node-end-frame', sourcePortId: 'out-image', targetNodeId: 'node-video', targetPortId: 'in-image-end' },
-      { id: 'c7', sourceNodeId: 'node-planner', sourcePortId: 'video_motion_prompt', targetNodeId: 'node-video', targetPortId: 'in-text' }
-    ],
-    nodes: [
-      { id: 'node-input', toolId: 'text-prompt', x: 50, y: 300, status: NodeStatus.IDLE, data: { value: "A futuristic cyberpunk city transitioning from day to rainy night." } },
-      { id: 'node-planner', toolId: 'gemini-text', x: 350, y: 300, status: NodeStatus.IDLE, data: { 
-          model: 'deepseek-v3-2-251201',
-          mode: 'basic',
-          customOutputs: [
-            { id: 'start_img_prompt', label: 'Start Frame Prompt', description: 'Detailed prompt for the initial image.' },
-            { id: 'end_img_prompt', label: 'End Frame Prompt', description: 'Detailed prompt for the target image, based on the start.' },
-            { id: 'video_motion_prompt', label: 'Motion Prompt', description: 'Prompt describing the transition and camera motion.' }
-          ]
-      } },
-      { id: 'node-start-frame', toolId: 'text-to-image', x: 700, y: 50, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-2512', aspectRatio: "16:9" } },
-      { id: 'node-end-frame', toolId: 'image-to-image', x: 700, y: 550, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511' } },
-      { id: 'node-video', toolId: 'video-gen-dual-frame', x: 1050, y: 300, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: "16:9" } }
-    ]
-  },
-  {
-    id: 'preset-s2v',
-    name: '文字-数字人视频工作流',
-    updatedAt: Date.now(),
-    isDirty: false,
-    isRunning: false,
-    env: {
-      lightx2v_url: "",
-      lightx2v_token: ""
-    },
-    globalInputs: {},
-    history: [],
-    showIntermediateResults: false,
-    connections: [
-      { id: 'c1', sourceNodeId: 'node-prompt', sourcePortId: 'out-text', targetNodeId: 'node-chat', targetPortId: 'in-text' },
-      { id: 'c2', sourceNodeId: 'node-chat', sourcePortId: 'image_prompt', targetNodeId: 'node-image', targetPortId: 'in-text' },
-      { id: 'c3', sourceNodeId: 'node-chat', sourcePortId: 'speech_text', targetNodeId: 'node-tts', targetPortId: 'in-text' },
-      { id: 'c4', sourceNodeId: 'node-chat', sourcePortId: 'tone', targetNodeId: 'node-tts', targetPortId: 'in-context-tone' },
-      { id: 'c5', sourceNodeId: 'node-image', sourcePortId: 'out-image', targetNodeId: 'node-avatar', targetPortId: 'in-image' },
-      { id: 'c6', sourceNodeId: 'node-tts', sourcePortId: 'out-audio', targetNodeId: 'node-avatar', targetPortId: 'in-audio' },
-      { id: 'c7', sourceNodeId: 'node-chat', sourcePortId: 'avatar_video_prompt', targetNodeId: 'node-avatar', targetPortId: 'in-text' }
-    ],
-    nodes: [
-      { id: 'node-prompt', toolId: 'text-prompt', x: 100, y: 200, status: NodeStatus.IDLE, data: { value: "一只哈士奇程序员狗，戴着耳机和工卡在办公，吐槽自己的程序员日常。用一些网络热梗。" } },
-      { id: 'node-chat', toolId: 'gemini-text', x: 450, y: 200, status: NodeStatus.IDLE, data: { 
-          model: 'deepseek-v3-2-251201',
-          mode: 'custom',
-          customInstruction: `你是一位专业的数字人视频脚本编写者。你的任务是根据用户的输入描述，为数字人视频创建完整的脚本包。
-
-重要提示：生成高质量、自然且引人入胜的数字人视频内容。
-
-对于 speech_text（语音文本）：
-- 编写自然、对话式的脚本，听起来真实可信
-- 保持简洁（正常语速下约20-40秒）
-- 使用清晰、直接的语言，符合角色的个性和风格
-- 确保脚本流畅自然，易于理解
-- 重要：不要在语音文本中使用括号、方括号或任何标记来表示语气或情感
-- 所有语气、情感和声音指令都应放在 'tone' 字段中，而不是 speech_text 中
-- 编写纯对话文本，不包含任何舞台指示或语气标记
-
-对于 tone（语调指令）：
-- 提供详细的配音指导，捕捉角色的个性
-- 包含情感提示、节奏、重音点和声音特征
-- 描述声音应该听起来如何（例如：温暖、权威、友好、严肃）
-- 包含语气应该转换或强调某些词语/短语的具体时刻
-- 使其对TTS系统具有可操作性，以产生自然的声音
-
-对于 image_prompt（肖像提示）：
-- 创建与描述角色匹配的详细肖像描述
-- 包含面部特征、年龄、表情、服装、背景、光线
-- 确保描述适合肖像图像生成
-- 匹配用户输入中角色的个性和风格
-- 包含将使头像看起来专业且引人入胜的视觉细节
-
-对于 avatar_video_prompt（数字人视频动作提示）：
-- 描述自然、真实的说话手势和动作
-- 包含头部动作（点头、倾斜、轻微转动）
-- 描述与语音内容和情感语调匹配的面部表情
-- 如果合适，包含肢体语言和手势
-- 指定眼神接触和视线方向
-- 确保动作与语音节奏同步
-- 足够详细，以指导数字人视频生成自然、逼真的效果
-
-以JSON格式输出所有四个字段。`,
-          customOutputs: [
-            { id: 'speech_text', label: '语音脚本', description: '人物对听众说的话。' },
-            { id: 'tone', label: '语调指令', description: '语音风格的提示。' },
-            { id: 'image_prompt', label: '肖像提示', description: '用于图像生成器的人物的肖像描述。' },
-            { id: 'avatar_video_prompt', label: '数字人视频动作提示', description: '数字人视频动作和运动的描述（例如：自然的说话手势、头部动作、面部表情）。' }
-          ]
-      } },
-      { id: 'node-image', toolId: 'text-to-image', x: 850, y: 50, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-2512', aspectRatio: "9:16" } },
-      { id: 'node-tts', toolId: 'tts', x: 850, y: 350, status: NodeStatus.IDLE, data: { model: 'lightx2v', voiceType: 'zh_male_dayi_saturn_bigtts', resourceId: 'seed-tts-2.0' } },
-      { id: 'node-avatar', toolId: 'avatar-gen', x: 1250, y: 200, status: NodeStatus.IDLE, data: {} }
-    ]
-  },
-  {
-    id: 'preset-avatar-i2i',
-    name: '人物图片+文字-数字人视频工作流',
-    updatedAt: Date.now(),
-    isDirty: false,
-    isRunning: false,
-    env: {
-      lightx2v_url: "",
-      lightx2v_token: ""
-    },
-    globalInputs: {},
-    history: [],
-    showIntermediateResults: true,
-    connections: [
-      { id: 'c1', sourceNodeId: 'node-img-in', sourcePortId: 'out-image', targetNodeId: 'node-i2i-gen', targetPortId: 'in-image' },
-      { id: 'c2', sourceNodeId: 'node-text-in', sourcePortId: 'out-text', targetNodeId: 'node-logic', targetPortId: 'in-text' },
-      { id: 'c3', sourceNodeId: 'node-logic', sourcePortId: 'i2i_prompt', targetNodeId: 'node-i2i-gen', targetPortId: 'in-text' },
-      { id: 'c4', sourceNodeId: 'node-logic', sourcePortId: 'tts_text', targetNodeId: 'node-voice', targetPortId: 'in-text' },
-      { id: 'c5', sourceNodeId: 'node-logic', sourcePortId: 'voice_style', targetNodeId: 'node-voice', targetPortId: 'in-context-tone' },
-      { id: 'c6', sourceNodeId: 'node-i2i-gen', sourcePortId: 'out-image', targetNodeId: 'node-final-avatar', targetPortId: 'in-image' },
-      { id: 'c7', sourceNodeId: 'node-voice', sourcePortId: 'out-audio', targetNodeId: 'node-final-avatar', targetPortId: 'in-audio' }
-    ],
-    nodes: [
-      { id: 'node-img-in', toolId: 'image-input', x: 50, y: 50, status: NodeStatus.IDLE, data: { value: [] } },
-      { id: 'node-text-in', toolId: 'text-prompt', x: 50, y: 350, status: NodeStatus.IDLE, data: { value: "A cheerful young lifestyle blogger, sharing a secret tip about the best morning routine in a sun-drenched minimalist coffee shop." } },
-      { id: 'node-logic', toolId: 'gemini-text', x: 400, y: 350, status: NodeStatus.IDLE, data: { 
-          model: 'deepseek-v3-2-251201',
-          mode: 'custom',
-          customInstruction: "You are a social media creative director. Your goal is to generate perfectly synchronized components for a digital avatar video. Ensure the image description matches the energy of the script, and the voice style captures the specific mood of the location and message.",
-          customOutputs: [
-            { id: 'i2i_prompt', label: 'Scene Edit Prompt', description: 'Modification prompt. Describe the character from the input image sitting in the specific coffee shop mentioned. Mention facial expression and posture that matches the script content.' },
-            { id: 'tts_text', label: 'Avatar Script', description: 'A 20-30 second spoken script. It should sound like a casual, intimate secret shared with a close friend.' },
-            { id: 'voice_style', label: 'Tone', description: 'Specific instructions for voice acting. Should start with a soft whispery secret tone and move to warm enthusiasm.' }
-          ]
-      } },
-      { id: 'node-i2i-gen', toolId: 'image-to-image', x: 800, y: 50, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      { id: 'node-voice', toolId: 'tts', x: 800, y: 450, status: NodeStatus.IDLE, data: { model: 'lightx2v', voiceType: 'zh_female_vv_uranus_bigtts', resourceId: 'seed-tts-2.0' } },
-      { id: 'node-final-avatar', toolId: 'avatar-gen', x: 1200, y: 250, status: NodeStatus.IDLE, data: {} }
-    ]
-  },
-  {
-    id: 'preset-storyboard-9',
-    name: '9分镜故事板视频工作流',
-    updatedAt: Date.now(),
-    isDirty: false,
-    isRunning: false,
-    env: {
-      lightx2v_url: "",
-      lightx2v_token: ""
-    },
-    globalInputs: {},
-    history: [],
-    showIntermediateResults: true,
-    connections: [
-      // Input to first image and planner
-      { id: 'c1', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-1', targetPortId: 'in-image' },
-      { id: 'c2', sourceNodeId: 'node-desc', sourcePortId: 'out-text', targetNodeId: 'node-planner', targetPortId: 'in-text' },
-      // Planner to image edits (sequential generation based on previous image + character)
-      { id: 'c3', sourceNodeId: 'node-planner', sourcePortId: 'scene1_prompt', targetNodeId: 'node-i2i-1', targetPortId: 'in-text' },
-      { id: 'c4', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-2', targetPortId: 'in-image' },
-      { id: 'c5', sourceNodeId: 'node-i2i-1', sourcePortId: 'out-image', targetNodeId: 'node-i2i-2', targetPortId: 'in-image' },
-      { id: 'c6', sourceNodeId: 'node-planner', sourcePortId: 'scene2_prompt', targetNodeId: 'node-i2i-2', targetPortId: 'in-text' },
-      { id: 'c7', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-3', targetPortId: 'in-image' },
-      { id: 'c8', sourceNodeId: 'node-i2i-2', sourcePortId: 'out-image', targetNodeId: 'node-i2i-3', targetPortId: 'in-image' },
-      { id: 'c9', sourceNodeId: 'node-planner', sourcePortId: 'scene3_prompt', targetNodeId: 'node-i2i-3', targetPortId: 'in-text' },
-      { id: 'c10', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-4', targetPortId: 'in-image' },
-      { id: 'c11', sourceNodeId: 'node-i2i-3', sourcePortId: 'out-image', targetNodeId: 'node-i2i-4', targetPortId: 'in-image' },
-      { id: 'c12', sourceNodeId: 'node-planner', sourcePortId: 'scene4_prompt', targetNodeId: 'node-i2i-4', targetPortId: 'in-text' },
-      { id: 'c13', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-5', targetPortId: 'in-image' },
-      { id: 'c14', sourceNodeId: 'node-i2i-4', sourcePortId: 'out-image', targetNodeId: 'node-i2i-5', targetPortId: 'in-image' },
-      { id: 'c15', sourceNodeId: 'node-planner', sourcePortId: 'scene5_prompt', targetNodeId: 'node-i2i-5', targetPortId: 'in-text' },
-      { id: 'c16', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-6', targetPortId: 'in-image' },
-      { id: 'c17', sourceNodeId: 'node-i2i-5', sourcePortId: 'out-image', targetNodeId: 'node-i2i-6', targetPortId: 'in-image' },
-      { id: 'c18', sourceNodeId: 'node-planner', sourcePortId: 'scene6_prompt', targetNodeId: 'node-i2i-6', targetPortId: 'in-text' },
-      { id: 'c19', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-7', targetPortId: 'in-image' },
-      { id: 'c20', sourceNodeId: 'node-i2i-6', sourcePortId: 'out-image', targetNodeId: 'node-i2i-7', targetPortId: 'in-image' },
-      { id: 'c21', sourceNodeId: 'node-planner', sourcePortId: 'scene7_prompt', targetNodeId: 'node-i2i-7', targetPortId: 'in-text' },
-      { id: 'c22', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-8', targetPortId: 'in-image' },
-      { id: 'c23', sourceNodeId: 'node-i2i-7', sourcePortId: 'out-image', targetNodeId: 'node-i2i-8', targetPortId: 'in-image' },
-      { id: 'c24', sourceNodeId: 'node-planner', sourcePortId: 'scene8_prompt', targetNodeId: 'node-i2i-8', targetPortId: 'in-text' },
-      { id: 'c25', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-9', targetPortId: 'in-image' },
-      { id: 'c26', sourceNodeId: 'node-i2i-8', sourcePortId: 'out-image', targetNodeId: 'node-i2i-9', targetPortId: 'in-image' },
-      { id: 'c27', sourceNodeId: 'node-planner', sourcePortId: 'scene9_prompt', targetNodeId: 'node-i2i-9', targetPortId: 'in-text' },
-      // Image to video generation (i2v: each image generates one video)
-      { id: 'c28', sourceNodeId: 'node-i2i-1', sourcePortId: 'out-image', targetNodeId: 'node-video-1', targetPortId: 'in-image' },
-      { id: 'c29', sourceNodeId: 'node-planner', sourcePortId: 'scene1_video', targetNodeId: 'node-video-1', targetPortId: 'in-text' },
-      { id: 'c30', sourceNodeId: 'node-i2i-2', sourcePortId: 'out-image', targetNodeId: 'node-video-2', targetPortId: 'in-image' },
-      { id: 'c31', sourceNodeId: 'node-planner', sourcePortId: 'scene2_video', targetNodeId: 'node-video-2', targetPortId: 'in-text' },
-      { id: 'c32', sourceNodeId: 'node-i2i-3', sourcePortId: 'out-image', targetNodeId: 'node-video-3', targetPortId: 'in-image' },
-      { id: 'c33', sourceNodeId: 'node-planner', sourcePortId: 'scene3_video', targetNodeId: 'node-video-3', targetPortId: 'in-text' },
-      { id: 'c34', sourceNodeId: 'node-i2i-4', sourcePortId: 'out-image', targetNodeId: 'node-video-4', targetPortId: 'in-image' },
-      { id: 'c35', sourceNodeId: 'node-planner', sourcePortId: 'scene4_video', targetNodeId: 'node-video-4', targetPortId: 'in-text' },
-      { id: 'c36', sourceNodeId: 'node-i2i-5', sourcePortId: 'out-image', targetNodeId: 'node-video-5', targetPortId: 'in-image' },
-      { id: 'c37', sourceNodeId: 'node-planner', sourcePortId: 'scene5_video', targetNodeId: 'node-video-5', targetPortId: 'in-text' },
-      { id: 'c38', sourceNodeId: 'node-i2i-6', sourcePortId: 'out-image', targetNodeId: 'node-video-6', targetPortId: 'in-image' },
-      { id: 'c39', sourceNodeId: 'node-planner', sourcePortId: 'scene6_video', targetNodeId: 'node-video-6', targetPortId: 'in-text' },
-      { id: 'c40', sourceNodeId: 'node-i2i-7', sourcePortId: 'out-image', targetNodeId: 'node-video-7', targetPortId: 'in-image' },
-      { id: 'c41', sourceNodeId: 'node-planner', sourcePortId: 'scene7_video', targetNodeId: 'node-video-7', targetPortId: 'in-text' },
-      { id: 'c42', sourceNodeId: 'node-i2i-8', sourcePortId: 'out-image', targetNodeId: 'node-video-8', targetPortId: 'in-image' },
-      { id: 'c43', sourceNodeId: 'node-planner', sourcePortId: 'scene8_video', targetNodeId: 'node-video-8', targetPortId: 'in-text' },
-      { id: 'c44', sourceNodeId: 'node-i2i-9', sourcePortId: 'out-image', targetNodeId: 'node-video-9', targetPortId: 'in-image' },
-      { id: 'c45', sourceNodeId: 'node-planner', sourcePortId: 'scene9_video', targetNodeId: 'node-video-9', targetPortId: 'in-text' }
-    ],
-    nodes: [
-      // Input nodes
-      { id: 'node-char-img', toolId: 'image-input', x: 50, y: 500, status: NodeStatus.IDLE, data: { value: [] } },
-      { id: 'node-desc', toolId: 'text-prompt', x: 50, y: 200, status: NodeStatus.IDLE, data: { value: "迪士尼风格的城堡公主早晨醒来，在温馨的房间里梳妆打扮，然后望向窗外，窗外是很漂亮的小镇风光，然后镜头转向远景能够看到公主在窗边伸了个懒腰" } },
-      // Planner node
-      { id: 'node-planner', toolId: 'gemini-text', x: 350, y: 350, status: NodeStatus.IDLE, data: { 
-          model: 'deepseek-v3-2-251201',
-          mode: 'custom',
-          customInstruction: `You are a video storyboard planner. Analyze the input description and break it down into exactly 9 scenes (shots) for sequential image generation.
-
-CRITICAL: Character and Scene Consistency is PARAMOUNT for this storyboard.
-
-For character consistency (ABSOLUTELY CRITICAL):
-- The SAME character must appear across ALL scenes that feature them
-- Maintain EXACT character features: facial features (eyes, nose, mouth, face shape), body shape, age, build, distinctive characteristics
-- HAIR consistency: If hair changes in any scene (e.g., from messy to styled, or changes color/style), ALL subsequent scenes MUST have the same hair style/color. Once hair changes, it MUST persist in all following scenes.
-- CLOTHING consistency: If clothing changes in any scene (e.g., from pajamas to dress, or from casual to formal), ALL subsequent scenes MUST feature the same clothing. Once clothing changes, it MUST persist in all following scenes. Explicitly state in prompts for scenes after the change that the character is wearing the same outfit as in the scene where the change occurred.
-- Character's appearance, age, build, and visual style MUST remain IDENTICAL across all scenes
-- Describe the character in detail with consistent attributes in every scene prompt
-- Track clothing and hair changes throughout the sequence and maintain consistency after any change
-
-For scene consistency (ABSOLUTELY CRITICAL):
-- If scenes take place in the SAME location (e.g., same room, same outdoor area), maintain IDENTICAL background elements, furniture, props, decorations, lighting direction, and spatial layout
-- If two consecutive scenes are in the same location, describe the EXACT same background elements, furniture arrangement, and props to avoid visual inconsistencies
-- Maintain the same artistic style (e.g., Disney style, realistic, etc.) across all scenes
-- Keep consistent lighting direction, intensity, and color palette throughout the storyboard
-- Ensure background elements and settings flow naturally between scenes
-- Maintain spatial relationships and visual continuity
-
-Image generation approach:
-- Scene 1: Generate based on character image + scene1_prompt (establishing the character's appearance and first scene)
-- Scene 2: Generate based on Scene 1 image + character image + scene2_prompt (maintains continuity from previous scene while preserving character identity)
-- Scene 3: Generate based on Scene 2 image + character image + scene3_prompt
-- And so on... Each scene uses the previous scene image + character image for continuity and character consistency
-
-Video generation:
-- Each scene will use image-to-video (i2v) generation
-- sceneN_video should describe the motion/camera movement for that scene
-
-For each scene, output:
-- sceneN_prompt: Detailed image generation prompt that describes the scene, maintaining character consistency (especially clothing/hair if changed - explicitly state if wearing same outfit/hair as previous scene) and scene consistency if in same location (explicitly describe same background elements)
-- sceneN_video: Video motion prompt describing camera movement and action for that scene
-
-Output format: JSON with exactly these fields:
-- scene1_prompt, scene1_video
-- scene2_prompt, scene2_video  
-- scene3_prompt, scene3_video
-- scene4_prompt, scene4_video
-- scene5_prompt, scene5_video
-- scene6_prompt, scene6_video
-- scene7_prompt, scene7_video
-- scene8_prompt, scene8_video
-- scene9_prompt, scene9_video
-
-IMPORTANT: In each prompt, explicitly maintain consistency:
-- If clothing changes in scene N, mention in scene(N+1)_prompt, scene(N+2)_prompt, etc. that "the character is wearing the same [outfit description] as in scene N"
-- If hair changes in scene N, mention in subsequent prompts that "the character has the same hair style/color as in scene N"
-- If scenes share the same location, explicitly describe the same background elements, furniture, props, and lighting`,
-          customOutputs: [
-            { id: 'scene1_prompt', label: 'Scene 1 Image Prompt', description: 'Detailed image prompt for scene 1 with character' },
-            { id: 'scene1_video', label: 'Scene 1 Video Prompt', description: 'Video motion prompt for scene 1' },
-            { id: 'scene2_prompt', label: 'Scene 2 Image Prompt', description: 'Detailed image prompt for scene 2 with character' },
-            { id: 'scene2_video', label: 'Scene 2 Video Prompt', description: 'Video motion prompt for scene 2' },
-            { id: 'scene3_prompt', label: 'Scene 3 Image Prompt', description: 'Detailed image prompt for scene 3 with character' },
-            { id: 'scene3_video', label: 'Scene 3 Video Prompt', description: 'Video motion prompt for scene 3' },
-            { id: 'scene4_prompt', label: 'Scene 4 Image Prompt', description: 'Detailed image prompt for scene 4 with character' },
-            { id: 'scene4_video', label: 'Scene 4 Video Prompt', description: 'Video motion prompt for scene 4' },
-            { id: 'scene5_prompt', label: 'Scene 5 Image Prompt', description: 'Detailed image prompt for scene 5 with character' },
-            { id: 'scene5_video', label: 'Scene 5 Video Prompt', description: 'Video motion prompt for scene 5' },
-            { id: 'scene6_prompt', label: 'Scene 6 Image Prompt', description: 'Detailed image prompt for scene 6 with character' },
-            { id: 'scene6_video', label: 'Scene 6 Video Prompt', description: 'Video motion prompt for scene 6' },
-            { id: 'scene7_prompt', label: 'Scene 7 Prompt', description: 'Image/video prompt for scene 7' },
-            { id: 'scene7_video', label: 'Scene 7 Video Prompt', description: 'Video motion prompt for scene 7' },
-            { id: 'scene8_prompt', label: 'Scene 8 Prompt', description: 'Image/video prompt for scene 8' },
-            { id: 'scene8_video', label: 'Scene 8 Video Prompt', description: 'Video motion prompt for scene 8' },
-            { id: 'scene9_prompt', label: 'Scene 9 Prompt', description: 'Image/video prompt for scene 9' },
-            { id: 'scene9_video', label: 'Scene 9 Video Prompt', description: 'Video motion prompt for scene 9' }
-          ]
-      } },
-      // Image-to-image nodes for all 9 scenes (sequential generation based on previous image + character)
-      { id: 'node-i2i-1', toolId: 'image-to-image', x: 750, y: 50, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      { id: 'node-i2i-2', toolId: 'image-to-image', x: 750, y: 150, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      { id: 'node-i2i-3', toolId: 'image-to-image', x: 750, y: 250, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      { id: 'node-i2i-4', toolId: 'image-to-image', x: 750, y: 350, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      { id: 'node-i2i-5', toolId: 'image-to-image', x: 750, y: 450, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      { id: 'node-i2i-6', toolId: 'image-to-image', x: 750, y: 550, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      { id: 'node-i2i-7', toolId: 'image-to-image', x: 750, y: 650, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      { id: 'node-i2i-8', toolId: 'image-to-image', x: 750, y: 750, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      { id: 'node-i2i-9', toolId: 'image-to-image', x: 750, y: 850, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      // Video generation nodes (all 9 scenes using image-to-video)
-      { id: 'node-video-1', toolId: 'video-gen-image', x: 1100, y: 50, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-      { id: 'node-video-2', toolId: 'video-gen-image', x: 1100, y: 150, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-      { id: 'node-video-3', toolId: 'video-gen-image', x: 1100, y: 250, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-      { id: 'node-video-4', toolId: 'video-gen-image', x: 1100, y: 350, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-      { id: 'node-video-5', toolId: 'video-gen-image', x: 1100, y: 450, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-      { id: 'node-video-6', toolId: 'video-gen-image', x: 1100, y: 550, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-      { id: 'node-video-7', toolId: 'video-gen-image', x: 1100, y: 650, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-      { id: 'node-video-8', toolId: 'video-gen-image', x: 1100, y: 750, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-      { id: 'node-video-9', toolId: 'video-gen-image', x: 1100, y: 850, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } }
-    ]
-  },
-  {
-    id: 'preset-multi-shot-singing',
-    name: '多机位唱歌',
-    updatedAt: Date.now(),
-    isDirty: false,
-    isRunning: false,
-    env: {
-      lightx2v_url: "",
-      lightx2v_token: ""
-    },
-    globalInputs: {},
-    history: [],
-    showIntermediateResults: true,
-    connections: [
-      // Input to AI Chat
-      { id: 'c1', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-planner', targetPortId: 'in-image' },
-      { id: 'c2', sourceNodeId: 'node-text-in', sourcePortId: 'out-text', targetNodeId: 'node-planner', targetPortId: 'in-text' },
-      // AI Chat to Image-to-Image (9 shots)
-      { id: 'c3', sourceNodeId: 'node-planner', sourcePortId: 'shot1_image_prompt', targetNodeId: 'node-i2i-1', targetPortId: 'in-text' },
-      { id: 'c4', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-1', targetPortId: 'in-image' },
-      { id: 'c5', sourceNodeId: 'node-planner', sourcePortId: 'shot2_image_prompt', targetNodeId: 'node-i2i-2', targetPortId: 'in-text' },
-      { id: 'c6', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-2', targetPortId: 'in-image' },
-      { id: 'c7', sourceNodeId: 'node-planner', sourcePortId: 'shot3_image_prompt', targetNodeId: 'node-i2i-3', targetPortId: 'in-text' },
-      { id: 'c8', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-3', targetPortId: 'in-image' },
-      { id: 'c9', sourceNodeId: 'node-planner', sourcePortId: 'shot4_image_prompt', targetNodeId: 'node-i2i-4', targetPortId: 'in-text' },
-      { id: 'c10', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-4', targetPortId: 'in-image' },
-      { id: 'c11', sourceNodeId: 'node-planner', sourcePortId: 'shot5_image_prompt', targetNodeId: 'node-i2i-5', targetPortId: 'in-text' },
-      { id: 'c12', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-5', targetPortId: 'in-image' },
-      { id: 'c28', sourceNodeId: 'node-planner', sourcePortId: 'shot6_image_prompt', targetNodeId: 'node-i2i-6', targetPortId: 'in-text' },
-      { id: 'c29', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-6', targetPortId: 'in-image' },
-      { id: 'c30', sourceNodeId: 'node-planner', sourcePortId: 'shot7_image_prompt', targetNodeId: 'node-i2i-7', targetPortId: 'in-text' },
-      { id: 'c31', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-7', targetPortId: 'in-image' },
-      { id: 'c32', sourceNodeId: 'node-planner', sourcePortId: 'shot8_image_prompt', targetNodeId: 'node-i2i-8', targetPortId: 'in-text' },
-      { id: 'c33', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-8', targetPortId: 'in-image' },
-      { id: 'c34', sourceNodeId: 'node-planner', sourcePortId: 'shot9_image_prompt', targetNodeId: 'node-i2i-9', targetPortId: 'in-text' },
-      { id: 'c35', sourceNodeId: 'node-char-img', sourcePortId: 'out-image', targetNodeId: 'node-i2i-9', targetPortId: 'in-image' },
-      // Image-to-Image to Video Generation (shots 1, 2, 5, 6, 8, 9 -> avatar-gen; shots 3, 4, 7 -> video-gen-image)
-      { id: 'c13', sourceNodeId: 'node-i2i-1', sourcePortId: 'out-image', targetNodeId: 'node-avatar-1', targetPortId: 'in-image' },
-      { id: 'c14', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-1', targetPortId: 'in-audio' },
-      { id: 'c15', sourceNodeId: 'node-planner', sourcePortId: 'shot1_video_prompt', targetNodeId: 'node-avatar-1', targetPortId: 'in-text' },
-      { id: 'c16', sourceNodeId: 'node-i2i-2', sourcePortId: 'out-image', targetNodeId: 'node-avatar-2', targetPortId: 'in-image' },
-      { id: 'c17', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-2', targetPortId: 'in-audio' },
-      { id: 'c18', sourceNodeId: 'node-planner', sourcePortId: 'shot2_video_prompt', targetNodeId: 'node-avatar-2', targetPortId: 'in-text' },
-      // Shot 3 (Wide) - Image-to-Video
-      { id: 'c19', sourceNodeId: 'node-i2i-3', sourcePortId: 'out-image', targetNodeId: 'node-video-3', targetPortId: 'in-image' },
-      { id: 'c21', sourceNodeId: 'node-planner', sourcePortId: 'shot3_video_prompt', targetNodeId: 'node-video-3', targetPortId: 'in-text' },
-      // Shot 4 (Top-down) - Image-to-Video
-      { id: 'c22', sourceNodeId: 'node-i2i-4', sourcePortId: 'out-image', targetNodeId: 'node-video-4', targetPortId: 'in-image' },
-      { id: 'c24', sourceNodeId: 'node-planner', sourcePortId: 'shot4_video_prompt', targetNodeId: 'node-video-4', targetPortId: 'in-text' },
-      { id: 'c25', sourceNodeId: 'node-i2i-5', sourcePortId: 'out-image', targetNodeId: 'node-avatar-5', targetPortId: 'in-image' },
-      { id: 'c26', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-5', targetPortId: 'in-audio' },
-      { id: 'c27', sourceNodeId: 'node-planner', sourcePortId: 'shot5_video_prompt', targetNodeId: 'node-avatar-5', targetPortId: 'in-text' },
-      { id: 'c36', sourceNodeId: 'node-i2i-6', sourcePortId: 'out-image', targetNodeId: 'node-avatar-6', targetPortId: 'in-image' },
-      { id: 'c37', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-6', targetPortId: 'in-audio' },
-      { id: 'c38', sourceNodeId: 'node-planner', sourcePortId: 'shot6_video_prompt', targetNodeId: 'node-avatar-6', targetPortId: 'in-text' },
-      // Shot 7 (Extreme wide) - Image-to-Video
-      { id: 'c39', sourceNodeId: 'node-i2i-7', sourcePortId: 'out-image', targetNodeId: 'node-video-7', targetPortId: 'in-image' },
-      { id: 'c41', sourceNodeId: 'node-planner', sourcePortId: 'shot7_video_prompt', targetNodeId: 'node-video-7', targetPortId: 'in-text' },
-      { id: 'c42', sourceNodeId: 'node-i2i-8', sourcePortId: 'out-image', targetNodeId: 'node-avatar-8', targetPortId: 'in-image' },
-      { id: 'c43', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-8', targetPortId: 'in-audio' },
-      { id: 'c44', sourceNodeId: 'node-planner', sourcePortId: 'shot8_video_prompt', targetNodeId: 'node-avatar-8', targetPortId: 'in-text' },
-      { id: 'c45', sourceNodeId: 'node-i2i-9', sourcePortId: 'out-image', targetNodeId: 'node-avatar-9', targetPortId: 'in-image' },
-      { id: 'c46', sourceNodeId: 'node-audio-in', sourcePortId: 'out-audio', targetNodeId: 'node-avatar-9', targetPortId: 'in-audio' },
-      { id: 'c47', sourceNodeId: 'node-planner', sourcePortId: 'shot9_video_prompt', targetNodeId: 'node-avatar-9', targetPortId: 'in-text' }
-    ],
-    nodes: [
-      // Input nodes
-      { id: 'node-char-img', toolId: 'image-input', x: 50, y: 500, status: NodeStatus.IDLE, data: { value: [] } },
-      { id: 'node-audio-in', toolId: 'audio-input', x: 50, y: 700, status: NodeStatus.IDLE, data: { value: null } },
-      { id: 'node-text-in', toolId: 'text-prompt', x: 50, y: 200, status: NodeStatus.IDLE, data: { value: "A professional singer performing a pop song with dynamic movements and expressions" } },
-      // AI Chat Planner (Doubao Vision)
-      { id: 'node-planner', toolId: 'gemini-text', x: 350, y: 400, status: NodeStatus.IDLE, data: { 
-          model: 'doubao-1-5-vision-pro-32k-250115',
-          mode: 'custom',
-          customInstruction: `You are a professional multi-camera music video director. Your task is to analyze the input character image and optional text description, then generate detailed descriptions for 9 different camera shots for a singing performance.
-
-CRITICAL: Character consistency is PARAMOUNT. The same character must appear in all shots with identical facial features, body shape, clothing, and appearance.
-
-Generate 9 distinct camera shots:
-1. Shot 1 - Close-up (特写): Face-focused shot showing detailed facial expressions, emotions, and lip-sync
-2. Shot 2 - Medium shot (中景): Upper body shot showing head, shoulders, and some arm movements
-3. Shot 3 - Wide shot (全景): Full body shot showing the entire character with background
-4. Shot 4 - Top-down shot (俯拍): Overhead or high-angle shot looking down at the character
-5. Shot 5 - Side angle (侧方位): Profile or 3/4 angle shot showing the character from the side
-6. Shot 6 - Low angle (仰拍): Low-angle shot looking up at the character, emphasizing power and presence
-7. Shot 7 - Extreme wide shot (极大景): Very wide shot showing the character in a vast environment, emphasizing scale and atmosphere
-8. Shot 8 - Over-shoulder (过肩): Over-the-shoulder shot showing the character from behind, creating intimacy
-9. Shot 9 - Extreme close-up (极特写): Extreme close-up focusing on eyes, mouth, or specific facial features
-
-For each shot, generate:
-- shotN_image_prompt: Detailed image generation prompt that describes the character in that specific camera angle and framing, maintaining exact character consistency (same face, clothing, appearance). Include camera angle, framing, background, lighting, and character pose/expression.
-- shotN_video_prompt: For shots 1, 2, 5, 6, 8, 9 (digital avatar shots): Detailed video action description for the digital avatar, including singing gestures, head movements, body language, facial expressions, and movements that match the song's rhythm and energy. For shots 3, 4, 7 (image-to-video shots): Detailed video motion description including camera movement, scene dynamics, and visual effects that match the song's rhythm and energy.
-
-Output format: JSON with exactly these fields:
-- shot1_image_prompt, shot1_video_prompt
-- shot2_image_prompt, shot2_video_prompt
-- shot3_image_prompt, shot3_video_prompt
-- shot4_image_prompt, shot4_video_prompt
-- shot5_image_prompt, shot5_video_prompt
-- shot6_image_prompt, shot6_video_prompt
-- shot7_image_prompt, shot7_video_prompt
-- shot8_image_prompt, shot8_video_prompt
-- shot9_image_prompt, shot9_video_prompt
-
-IMPORTANT: 
-- Maintain EXACT character consistency across all shots (same face, clothing, appearance)
-- Each shot should have a distinct camera angle and framing
-- Video prompts should describe natural singing movements and expressions`,
-          customOutputs: [
-            { id: 'shot1_image_prompt', label: 'Shot 1 Image Prompt (Close-up)', description: 'Close-up shot image description' },
-            { id: 'shot1_video_prompt', label: 'Shot 1 Video Prompt', description: 'Close-up shot video action description' },
-            { id: 'shot2_image_prompt', label: 'Shot 2 Image Prompt (Medium)', description: 'Medium shot image description' },
-            { id: 'shot2_video_prompt', label: 'Shot 2 Video Prompt', description: 'Medium shot video action description' },
-            { id: 'shot3_image_prompt', label: 'Shot 3 Image Prompt (Wide)', description: 'Wide shot image description' },
-            { id: 'shot3_video_prompt', label: 'Shot 3 Video Prompt', description: 'Wide shot video action description' },
-            { id: 'shot4_image_prompt', label: 'Shot 4 Image Prompt (Top-down)', description: 'Top-down shot image description' },
-            { id: 'shot4_video_prompt', label: 'Shot 4 Video Prompt', description: 'Top-down shot video action description' },
-            { id: 'shot5_image_prompt', label: 'Shot 5 Image Prompt (Side)', description: 'Side angle shot image description' },
-            { id: 'shot5_video_prompt', label: 'Shot 5 Video Prompt', description: 'Side angle shot video action description' },
-            { id: 'shot6_image_prompt', label: 'Shot 6 Image Prompt (Low angle)', description: 'Low-angle shot image description' },
-            { id: 'shot6_video_prompt', label: 'Shot 6 Video Prompt', description: 'Low-angle shot video action description' },
-            { id: 'shot7_image_prompt', label: 'Shot 7 Image Prompt (Extreme wide)', description: 'Extreme wide shot image description' },
-            { id: 'shot7_video_prompt', label: 'Shot 7 Video Prompt', description: 'Extreme wide shot video motion description' },
-            { id: 'shot8_image_prompt', label: 'Shot 8 Image Prompt (Over-shoulder)', description: 'Over-shoulder shot image description' },
-            { id: 'shot8_video_prompt', label: 'Shot 8 Video Prompt', description: 'Over-shoulder shot video action description' },
-            { id: 'shot9_image_prompt', label: 'Shot 9 Image Prompt (Extreme close-up)', description: 'Extreme close-up shot image description' },
-            { id: 'shot9_video_prompt', label: 'Shot 9 Video Prompt', description: 'Extreme close-up shot video action description' }
-          ]
-      } },
-      // Image-to-Image nodes (9 shots)
-      { id: 'node-i2i-1', toolId: 'image-to-image', x: 800, y: 50, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      { id: 'node-i2i-2', toolId: 'image-to-image', x: 800, y: 150, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      { id: 'node-i2i-3', toolId: 'image-to-image', x: 800, y: 250, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      { id: 'node-i2i-4', toolId: 'image-to-image', x: 800, y: 350, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      { id: 'node-i2i-5', toolId: 'image-to-image', x: 800, y: 450, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      { id: 'node-i2i-6', toolId: 'image-to-image', x: 800, y: 550, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      { id: 'node-i2i-7', toolId: 'image-to-image', x: 800, y: 650, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      { id: 'node-i2i-8', toolId: 'image-to-image', x: 800, y: 750, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      { id: 'node-i2i-9', toolId: 'image-to-image', x: 800, y: 850, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-      // Avatar Video nodes (shots 1, 2, 5, 6, 8, 9 - digital avatar)
-      { id: 'node-avatar-1', toolId: 'avatar-gen', x: 1200, y: 50, status: NodeStatus.IDLE, data: {} },
-      { id: 'node-avatar-2', toolId: 'avatar-gen', x: 1200, y: 150, status: NodeStatus.IDLE, data: {} },
-      { id: 'node-avatar-5', toolId: 'avatar-gen', x: 1200, y: 450, status: NodeStatus.IDLE, data: {} },
-      { id: 'node-avatar-6', toolId: 'avatar-gen', x: 1200, y: 550, status: NodeStatus.IDLE, data: {} },
-      { id: 'node-avatar-8', toolId: 'avatar-gen', x: 1200, y: 750, status: NodeStatus.IDLE, data: {} },
-      { id: 'node-avatar-9', toolId: 'avatar-gen', x: 1200, y: 850, status: NodeStatus.IDLE, data: {} },
-      // Image-to-Video nodes (shots 3, 4, 7 - image-to-video)
-      { id: 'node-video-3', toolId: 'video-gen-image', x: 1200, y: 250, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-      { id: 'node-video-4', toolId: 'video-gen-image', x: 1200, y: 350, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-      { id: 'node-video-7', toolId: 'video-gen-image', x: 1200, y: 650, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } }
-    ]
-  },
-  {
-    id: 'preset-cinematic-oner',
-    name: '大师级运镜一镜到底视频工作流',
-    updatedAt: Date.now(),
-    isDirty: false,
-    isRunning: false,
-    env: {
-      lightx2v_url: "",
-      lightx2v_token: ""
-    },
-    globalInputs: {},
-    history: [],
-    showIntermediateResults: true,
-    connections: [
-      // Input to planner
-      { id: 'oner-c1', sourceNodeId: 'oner-node-desc', sourcePortId: 'out-text', targetNodeId: 'oner-node-planner', targetPortId: 'in-text' },
-      // Planner to image generation (5 cinematic shots)
-      { id: 'oner-c2', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot1_image_prompt', targetNodeId: 'oner-node-img-1', targetPortId: 'in-text' },
-      { id: 'oner-c3', sourceNodeId: 'oner-node-img-1', sourcePortId: 'out-image', targetNodeId: 'oner-node-img-2', targetPortId: 'in-image' },
-      { id: 'oner-c4', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot2_image_prompt', targetNodeId: 'oner-node-img-2', targetPortId: 'in-text' },
-      { id: 'oner-c5', sourceNodeId: 'oner-node-img-2', sourcePortId: 'out-image', targetNodeId: 'oner-node-img-3', targetPortId: 'in-image' },
-      { id: 'oner-c6', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot3_image_prompt', targetNodeId: 'oner-node-img-3', targetPortId: 'in-text' },
-      { id: 'oner-c7', sourceNodeId: 'oner-node-img-3', sourcePortId: 'out-image', targetNodeId: 'oner-node-img-4', targetPortId: 'in-image' },
-      { id: 'oner-c8', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot4_image_prompt', targetNodeId: 'oner-node-img-4', targetPortId: 'in-text' },
-      { id: 'oner-c9', sourceNodeId: 'oner-node-img-4', sourcePortId: 'out-image', targetNodeId: 'oner-node-img-5', targetPortId: 'in-image' },
-      { id: 'oner-c10', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot5_image_prompt', targetNodeId: 'oner-node-img-5', targetPortId: 'in-text' },
-      // Image to video generation
-      { id: 'oner-c11', sourceNodeId: 'oner-node-img-1', sourcePortId: 'out-image', targetNodeId: 'oner-node-video-1', targetPortId: 'in-image' },
-      { id: 'oner-c12', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot1_video_motion', targetNodeId: 'oner-node-video-1', targetPortId: 'in-text' },
-      { id: 'oner-c13', sourceNodeId: 'oner-node-img-2', sourcePortId: 'out-image', targetNodeId: 'oner-node-video-2', targetPortId: 'in-image' },
-      { id: 'oner-c14', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot2_video_motion', targetNodeId: 'oner-node-video-2', targetPortId: 'in-text' },
-      { id: 'oner-c15', sourceNodeId: 'oner-node-img-3', sourcePortId: 'out-image', targetNodeId: 'oner-node-video-3', targetPortId: 'in-image' },
-      { id: 'oner-c16', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot3_video_motion', targetNodeId: 'oner-node-video-3', targetPortId: 'in-text' },
-      { id: 'oner-c17', sourceNodeId: 'oner-node-img-4', sourcePortId: 'out-image', targetNodeId: 'oner-node-video-4', targetPortId: 'in-image' },
-      { id: 'oner-c18', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot4_video_motion', targetNodeId: 'oner-node-video-4', targetPortId: 'in-text' },
-      { id: 'oner-c19', sourceNodeId: 'oner-node-img-5', sourcePortId: 'out-image', targetNodeId: 'oner-node-video-5', targetPortId: 'in-image' },
-      { id: 'oner-c20', sourceNodeId: 'oner-node-planner', sourcePortId: 'shot5_video_motion', targetNodeId: 'oner-node-video-5', targetPortId: 'in-text' }
-    ],
-    nodes: [
-      { id: 'oner-node-desc', toolId: 'text-prompt', x: 50, y: 400, status: NodeStatus.IDLE, data: { value: "一座未来主义赛博朋克城市的宏大全景，从高空俯瞰整座城市，镜头逐渐下降穿过云雾，掠过摩天大楼的玻璃幕墙，最终聚焦到繁华街道上的人群和霓虹灯" } },
-      { id: 'oner-node-planner', toolId: 'gemini-text', x: 350, y: 400, status: NodeStatus.IDLE, data: { 
-          model: 'deepseek-v3-2-251201',
-          mode: 'custom',
-          customInstruction: `你是一位专业的电影级视频分镜设计师。你的任务是根据用户的场景描述，设计一个"一镜到底"的连续运镜视频。
-
-重要原则：
-- 这是"一镜到底"视频，所有镜头必须形成连续、流畅的视觉过渡
-- 运用多种电影级运镜技巧：极远景、全景、中景、近景、特写、推拉镜头、跟随镜头、环绕镜头、升降镜头、俯仰镜头等
-- 场景必须宏大、震撼，具有视觉冲击力
-- 保持场景一致性和视觉连贯性（同一场景的不同视角）
-- 每个分镜的视觉风格、色调、氛围必须统一
-- 镜头运动要流畅自然，前后分镜要有逻辑连接
-
-输出要求：
-- 生成5个分镜，每个分镜包含：
-  - shotN_image_prompt: 详细的图像生成提示词，描述该分镜的画面内容、构图、光线、氛围
-  - shotN_video_motion: 详细的视频运动提示词，描述该分镜的相机运动、运镜方式、运动方向、速度
-
-分镜设计思路（参考）：
-- 分镜1: 极远景/全景 - 建立宏大场景，可能是高空俯瞰或全景展示
-- 分镜2: 中景/推拉 - 镜头逐渐接近，或从一侧移动到另一侧
-- 分镜3: 中景/跟随/环绕 - 镜头运动，展现场景的深度和细节
-- 分镜4: 近景/特写 - 聚焦到场景中的关键元素或细节
-- 分镜5: 全景/极远景收尾 - 回到宏大的视角，形成视觉闭环
-
-每个image_prompt应该：
-- 详细描述画面内容、构图（构图规则，如三分法、对称等）
-- 描述光线（自然光、人工光、色调、明暗对比）
-- 描述氛围和情绪
-- 保持场景元素的连贯性（如果是同一个场景，要描述相同的元素）
-
-每个video_motion应该：
-- 描述相机运动类型（推、拉、摇、移、跟、环绕、升降等）
-- 描述运动方向和路径
-- 描述运动速度（慢、中、快）
-- 描述相机角度（平视、俯视、仰视、斜角等）
-- 确保与下一个分镜的运动形成流畅过渡
-
-输出JSON格式，包含以下字段：
-- shot1_image_prompt, shot1_video_motion
-- shot2_image_prompt, shot2_video_motion
-- shot3_image_prompt, shot3_video_motion
-- shot4_image_prompt, shot4_video_motion
-- shot5_image_prompt, shot5_video_motion`,
-          customOutputs: [
-            { id: 'shot1_image_prompt', label: '分镜1图像提示', description: '第一分镜的详细图像生成提示词（远景/全景，建立宏大场景）' },
-            { id: 'shot1_video_motion', label: '分镜1运镜描述', description: '第一分镜的视频运动提示词（相机运动方式）' },
-            { id: 'shot2_image_prompt', label: '分镜2图像提示', description: '第二分镜的详细图像生成提示词（中景，镜头逐渐接近）' },
-            { id: 'shot2_video_motion', label: '分镜2运镜描述', description: '第二分镜的视频运动提示词' },
-            { id: 'shot3_image_prompt', label: '分镜3图像提示', description: '第三分镜的详细图像生成提示词（中景/跟随，展现深度）' },
-            { id: 'shot3_video_motion', label: '分镜3运镜描述', description: '第三分镜的视频运动提示词' },
-            { id: 'shot4_image_prompt', label: '分镜4图像提示', description: '第四分镜的详细图像生成提示词（近景/特写，聚焦细节）' },
-            { id: 'shot4_video_motion', label: '分镜4运镜描述', description: '第四分镜的视频运动提示词' },
-            { id: 'shot5_image_prompt', label: '分镜5图像提示', description: '第五分镜的详细图像生成提示词（全景收尾，视觉闭环）' },
-            { id: 'shot5_video_motion', label: '分镜5运镜描述', description: '第五分镜的视频运动提示词' }
-          ]
-      } },
-      { id: 'oner-node-img-1', toolId: 'text-to-image', x: 700, y: 100, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-2512', aspectRatio: "16:9" } },
-      { id: 'oner-node-img-2', toolId: 'image-to-image', x: 700, y: 250, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: "16:9" } },
-      { id: 'oner-node-img-3', toolId: 'image-to-image', x: 700, y: 400, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: "16:9" } },
-      { id: 'oner-node-img-4', toolId: 'image-to-image', x: 700, y: 550, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: "16:9" } },
-      { id: 'oner-node-img-5', toolId: 'image-to-image', x: 700, y: 700, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: "16:9" } },
-      { id: 'oner-node-video-1', toolId: 'video-gen-image', x: 1050, y: 100, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: "16:9" } },
-      { id: 'oner-node-video-2', toolId: 'video-gen-image', x: 1050, y: 250, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: "16:9" } },
-      { id: 'oner-node-video-3', toolId: 'video-gen-image', x: 1050, y: 400, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: "16:9" } },
-      { id: 'oner-node-video-4', toolId: 'video-gen-image', x: 1050, y: 550, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: "16:9" } },
-      { id: 'oner-node-video-5', toolId: 'video-gen-image', x: 1050, y: 700, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: "16:9" } }
-    ]
-  }
-];
 
 // --- Main App ---
 
@@ -810,6 +228,7 @@ const App: React.FC = () => {
   const [view, setView] = useState({ x: 0, y: 0, zoom: 1 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [isOverNode, setIsOverNode] = useState(false);
   const [draggingNode, setDraggingNode] = useState<{ id: string; offsetX: number; offsetY: number } | null>(null);
   const [connecting, setConnecting] = useState<{ nodeId: string; portId: string; type: DataType; direction: 'in' | 'out'; startX: number; startY: number } | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -833,12 +252,18 @@ const App: React.FC = () => {
   const [isGeneratingWorkflow, setIsGeneratingWorkflow] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const isPausedRef = useRef(false);
+  const runningTaskIdsRef = useRef<Map<string, string>>(new Map()); // Map<nodeId, taskId> for tracking LightX2V tasks
+  const abortControllerRef = useRef<AbortController | null>(null); // AbortController for cancelling tasks
   const [showReplaceMenu, setShowReplaceMenu] = useState<string | null>(null);
+  const [showOutputQuickAdd, setShowOutputQuickAdd] = useState<{ nodeId: string; portId: string } | null>(null); // { nodeId, portId } for output port quick add menu
+  const [showModelSelect, setShowModelSelect] = useState<string | null>(null); // nodeId for model selection dropdown
+  const [showVoiceSelect, setShowVoiceSelect] = useState<string | null>(null); // nodeId for voice selection dropdown
   const [showAudioEditor, setShowAudioEditor] = useState<string | null>(null); // nodeId of audio input being edited
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [resultsCollapsed, setResultsCollapsed] = useState(true); // Default collapsed
   
   const canvasRef = useRef<HTMLDivElement>(null);
+  const nodeHeightsRef = useRef<Map<string, number>>(new Map());
 
   const t = useCallback((key: string) => {
     return TRANSLATIONS[lang][key] || key;
@@ -959,6 +384,23 @@ Requirements:
 7. Connect nodes logically - source outputs must match target input types
 8. Use appropriate default values in data (e.g., aspectRatio for video tools)
 9. Provide a descriptive name for the workflow
+
+IMPORTANT - Smart Default Values:
+Based on the user's description, intelligently fill in default values for nodes to reduce user editing work:
+- For text-prompt nodes: Set data.value to appropriate text based on user requirements
+- For image-to-image nodes: Set data.value (prompt field) to transformation instructions based on user description (e.g., if user wants "cartoon style", use prompt like "Transform the image into cartoon style, maintaining character consistency")
+- For text-to-image nodes: Set data.value to image generation prompts based on user requirements
+- For video nodes: Set data.value to appropriate motion/camera prompts based on user description
+- For TTS nodes: Set data.value (text field) to appropriate text based on user requirements
+- For AI chat nodes: Set customInstruction to appropriate system instructions based on user requirements
+- Analyze the user's description carefully and extract the specific transformation, style, content, or operation they want, then set the corresponding node's data values accordingly
+- The goal is to minimize the need for users to manually edit node values after workflow generation
+
+Examples:
+- If user wants "cartoon style transformation": image-to-image node should have data.value like "Transform into cartoon style, maintain character features"
+- If user wants "portrait generation": text-to-image node should have data.value like "A detailed portrait photo"
+- If user wants "voice narration": TTS node should have data.value with appropriate narration text
+- Extract specific requirements from user description and pre-fill node values accordingly
 
 Output ONLY the JSON, no additional text or markdown.`;
 
@@ -1494,18 +936,26 @@ Output ONLY the JSON, no additional text or markdown.`;
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedNodeId, selectedConnectionId]);
 
-  // Close replace menu when clicking outside
+  // Close replace menu, output quick add menu, model select, and voice select when clicking outside
   useEffect(() => {
-    if (!showReplaceMenu) return;
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest('.replace-menu-container')) {
+      if (showReplaceMenu && !target.closest('.replace-menu-container')) {
         setShowReplaceMenu(null);
+      }
+      if (showOutputQuickAdd && !target.closest('.output-quick-add-menu')) {
+        setShowOutputQuickAdd(null);
+      }
+      if (showModelSelect && !target.closest('.model-select-container')) {
+        setShowModelSelect(null);
+      }
+      if (showVoiceSelect && !target.closest('.voice-select-container')) {
+        setShowVoiceSelect(null);
       }
     };
     window.addEventListener('click', handleClickOutside);
     return () => window.removeEventListener('click', handleClickOutside);
-  }, [showReplaceMenu]);
+  }, [showReplaceMenu, showOutputQuickAdd, showModelSelect, showVoiceSelect]);
 
   const deleteSelectedNode = useCallback(() => {
     if (!selectedNodeId) return;
@@ -1570,19 +1020,27 @@ Output ONLY the JSON, no additional text or markdown.`;
     
     // Handle gemini-text special case (dynamic outputs)
     let newToolOutputs: Port[] = [];
+    let newCustomOutputs: any[] | undefined = undefined;
     if (newToolId === 'gemini-text') {
       // If replacing with gemini-text, preserve customOutputs if they exist
       if (node.toolId === 'gemini-text' && node.data.customOutputs) {
         newToolOutputs = node.data.customOutputs.map((o: any) => ({ ...o, type: DataType.TEXT }));
+        newCustomOutputs = node.data.customOutputs;
       } else {
-        // Otherwise, use default outputs (empty for gemini-text)
-        newToolOutputs = [];
+        // When replacing another node with gemini-text, create customOutputs based on current node outputs
+        // This allows replacement of nodes with outputs
+        newCustomOutputs = currentNodeOutputs.map((out, idx) => ({
+          id: `out-${idx + 1}`,
+          label: out.label || `Output ${idx + 1}`,
+          description: out.label || `Output ${idx + 1}`
+        }));
+        newToolOutputs = newCustomOutputs.map((o: any) => ({ ...o, type: DataType.TEXT }));
       }
     } else {
       newToolOutputs = newTool.outputs;
     }
     
-    // Check if outputs are compatible
+    // Check if outputs are compatible (for gemini-text, we've already created matching outputs)
     if (currentNodeOutputs.length !== newToolOutputs.length) return;
     const isCompatible = currentNodeOutputs.every((out, idx) => {
       if (idx >= newToolOutputs.length) return false;
@@ -1611,7 +1069,7 @@ Output ONLY the JSON, no additional text or markdown.`;
           // Reset model if the new tool doesn't have models
           model: newTool.models && newTool.models.length > 0 ? (newTool.models[0].id || node.data.model) : undefined,
           // Preserve customOutputs if replacing with gemini-text and current node has them
-          customOutputs: (newToolId === 'gemini-text' && node.toolId === 'gemini-text' && node.data.customOutputs) ? node.data.customOutputs : (newToolId === 'gemini-text' ? undefined : node.data.customOutputs)
+          customOutputs: newToolId === 'gemini-text' ? (newCustomOutputs || node.data.customOutputs) : (newToolId !== 'gemini-text' ? node.data.customOutputs : undefined)
         },
         status: NodeStatus.IDLE,
         error: undefined,
@@ -1620,7 +1078,11 @@ Output ONLY the JSON, no additional text or markdown.`;
       };
       
       // Update connections: map old output port IDs to new ones
+      // Special handling for TTS -> Voice Clone replacement
+      const isTTSToVoiceClone = node.toolId === 'tts' && newToolId === 'lightx2v-voice-clone';
+      
       const updatedConnections = prev.connections.map(conn => {
+        // Handle output connections (source is the replaced node)
         if (conn.sourceNodeId === nodeId) {
           const newSourcePortId = outputPortMap[conn.sourcePortId];
           if (newSourcePortId) {
@@ -1629,6 +1091,47 @@ Output ONLY the JSON, no additional text or markdown.`;
           // If no mapping found, remove the connection
           return null;
         }
+        
+        // Handle input connections (target is the replaced node)
+        if (conn.targetNodeId === nodeId) {
+          // Special case: TTS -> Voice Clone
+          if (isTTSToVoiceClone) {
+            // Map in-text to in-tts-text
+            if (conn.targetPortId === 'in-text') {
+              return { ...conn, targetPortId: 'in-tts-text' };
+            }
+            // Remove in-context-tone connection
+            if (conn.targetPortId === 'in-context-tone') {
+              return null;
+            }
+          }
+          
+          // For other replacements, try to map input ports
+          const oldTool = TOOLS.find(t => t.id === node.toolId);
+          const oldInputs = oldTool?.inputs || [];
+          const newInputs = newTool.inputs || [];
+          
+          // Try to find matching input port by type and position
+          const oldInputIndex = oldInputs.findIndex(inp => inp.id === conn.targetPortId);
+          if (oldInputIndex >= 0 && oldInputIndex < newInputs.length) {
+            const oldInput = oldInputs[oldInputIndex];
+            const newInput = newInputs[oldInputIndex];
+            // Only map if types match
+            if (oldInput.type === newInput.type) {
+              return { ...conn, targetPortId: newInput.id };
+            }
+          }
+          
+          // If no mapping found, check if port ID exists in new tool
+          const portExists = newInputs.some(inp => inp.id === conn.targetPortId);
+          if (portExists) {
+            return conn; // Keep connection if port exists
+          }
+          
+          // Remove connection if port doesn't exist
+          return null;
+        }
+        
         return conn;
       }).filter((c): c is Connection => c !== null);
       
@@ -1696,6 +1199,67 @@ Output ONLY the JSON, no additional text or markdown.`;
     });
     setSelectedNodeId(newNodeId);
   };
+
+  // Get tools that can accept a specific output type
+  const getCompatibleToolsForOutput = useCallback((outputType: DataType): ToolDefinition[] => {
+    return TOOLS.filter(tool => {
+      // Skip input nodes
+      if (tool.category === 'Input') return false;
+      // Find tools that have at least one input port matching the output type
+      return tool.inputs.some(input => input.type === outputType);
+    });
+  }, []);
+
+  // Quick add node from output port
+  const quickAddOutput = useCallback((node: WorkflowNode, port: Port, toolId: string) => {
+    if (selectedRunId) setSelectedRunId(null);
+    const targetTool = TOOLS.find(t => t.id === toolId);
+    if (!targetTool) return;
+    
+    // Find the input port that matches the output type
+    const matchingInput = targetTool.inputs.find(input => input.type === port.type);
+    if (!matchingInput) return;
+    
+    const worldPos = { x: node.x + 300, y: node.y };
+    const newNodeId = `node-target-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    
+    const defaultData: Record<string, any> = {};
+    if (targetTool.models && targetTool.models.length > 0) defaultData.model = targetTool.models[0].id;
+    if (targetTool.id === 'gemini-text') {
+      // Set default customOutputs for gemini-text
+      defaultData.customOutputs = [{ id: 'out-text', label: t('execution_results'), description: 'Main text response.' }];
+      defaultData.mode = 'basic';
+    }
+    
+    const newNode: WorkflowNode = { 
+      id: newNodeId, 
+      toolId: targetTool.id, 
+      x: worldPos.x, 
+      y: worldPos.y, 
+      status: NodeStatus.IDLE, 
+      data: defaultData 
+    };
+
+    const newConn: Connection = { 
+      id: `conn-${Date.now()}`, 
+      sourceNodeId: node.id, 
+      sourcePortId: port.id,
+      targetNodeId: newNodeId, 
+      targetPortId: matchingInput.id 
+    };
+
+    setWorkflow(prev => {
+      if (!prev) return null;
+      return { 
+        ...prev, 
+        nodes: [...prev.nodes, newNode],
+        connections: [...prev.connections, newConn], 
+        isDirty: true 
+      };
+    });
+    setSelectedNodeId(newNodeId);
+    setShowOutputQuickAdd(null);
+  }, [selectedRunId, t]);
 
   const getNodeOutputs = (node: WorkflowNode): Port[] => {
     const tool = TOOLS.find(t => t.id === node.toolId);
@@ -1785,6 +1349,16 @@ Output ONLY the JSON, no additional text or markdown.`;
           });
         }
       });
+      
+      // Special validation for voice clone nodes
+      if (node.toolId === 'lightx2v-voice-clone') {
+        if (!node.data.speakerId) {
+          errors.push({
+            message: `${lang === 'zh' ? tool.name_zh : tool.name}: ${lang === 'zh' ? '请选择克隆音色' : 'Please select a cloned voice'}`,
+            type: 'INPUT'
+          });
+        }
+      }
     });
 
     return errors;
@@ -1917,7 +1491,7 @@ Output ONLY the JSON, no additional text or markdown.`;
             
             try {
               const nodeInputs: Record<string, any> = {};
-              tool.inputs.forEach(port => {
+              await Promise.all(tool.inputs.map(async (port) => {
                 // Check if there's an override value for this port
                 if (node.data.inputOverrides && node.data.inputOverrides[port.id] !== undefined) {
                   nodeInputs[port.id] = node.data.inputOverrides[port.id];
@@ -1926,7 +1500,7 @@ Output ONLY the JSON, no additional text or markdown.`;
                 
                 const conns = incomingConns.filter(c => c.targetPortId === port.id);
                 if (conns.length > 0) {
-                  const values = conns.map(c => {
+                  const values = (await Promise.all(conns.map(async (c) => {
                   // First check if source node has executed and has output in sessionOutputs
                   if (sessionOutputs[c.sourceNodeId] !== undefined) {
                     const sourceRes = sessionOutputs[c.sourceNodeId];
@@ -1939,7 +1513,50 @@ Output ONLY the JSON, no additional text or markdown.`;
                     const sourceTool = TOOLS.find(t => t.id === sourceNode.toolId);
                     if (sourceTool?.category === 'Input') {
                       // For input nodes, read directly from node.data.value
-                      const inputValue = sourceNode.data.value;
+                      let inputValue = sourceNode.data.value;
+                      
+                      // Convert file paths to base64 data URLs for image and audio inputs
+                      if (sourceNode.toolId === 'image-input' && Array.isArray(inputValue) && inputValue.length > 0) {
+                        inputValue = await Promise.all(inputValue.map(async (img: string) => {
+                          // If it's already a data URL or base64, return as is
+                          if (img.startsWith('data:') || (!img.startsWith('http') && img.includes(','))) {
+                            return img;
+                          }
+                          // If it's a file path (starts with /), load and convert to base64
+                          if (img.startsWith('/')) {
+                            try {
+                              const response = await fetch(img);
+                              const blob = await response.blob();
+                              return await new Promise<string>((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onloadend = () => resolve(reader.result as string);
+                                reader.onerror = reject;
+                                reader.readAsDataURL(blob);
+                              });
+                            } catch (e) {
+                              console.error(`Failed to load image ${img}:`, e);
+                              return img; // Return original path if loading fails
+                            }
+                          }
+                          return img;
+                        }));
+                      } else if (sourceNode.toolId === 'audio-input' && inputValue && typeof inputValue === 'string' && inputValue.startsWith('/')) {
+                        // Convert audio file path to base64 data URL
+                        try {
+                          const response = await fetch(inputValue);
+                          const blob = await response.blob();
+                          inputValue = await new Promise<string>((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result as string);
+                            reader.onerror = reject;
+                            reader.readAsDataURL(blob);
+                          });
+                        } catch (e) {
+                          console.error(`Failed to load audio ${inputValue}:`, e);
+                          // Keep original path if loading fails
+                        }
+                      }
+                      
                       // Check if this is a multi-output node (like gemini-text with customOutputs)
                       if (sourceNode.toolId === 'gemini-text' && sourceNode.data.customOutputs && typeof inputValue === 'object' && inputValue !== null) {
                         return c.sourcePortId in inputValue ? inputValue[c.sourcePortId] : inputValue;
@@ -1954,27 +1571,91 @@ Output ONLY the JSON, no additional text or markdown.`;
                     }
               }
               return undefined;
-            }).filter(v => v !== undefined).flat();
+            }))).filter(v => v !== undefined).flat();
               nodeInputs[port.id] = values.length === 1 ? values[0] : values.length > 0 ? values : undefined;
                 } else nodeInputs[port.id] = workflow.globalInputs[`${node.id}-${port.id}`];
-              });
+              }));
 
               let result: any;
               const model = node.data.model;
               switch (node.toolId) {
                 case 'text-prompt': result = node.data.value || ""; break;
-                case 'image-input': result = node.data.value || []; break;
-                case 'audio-input': result = node.data.value; break;
+                case 'image-input': 
+                  const imageValue = node.data.value || [];
+                  // Convert file paths to base64 data URLs if needed
+                  if (Array.isArray(imageValue) && imageValue.length > 0) {
+                    const convertedImages = await Promise.all(imageValue.map(async (img: string) => {
+                      // If it's already a data URL or base64, return as is
+                      if (img.startsWith('data:') || (!img.startsWith('http') && img.includes(','))) {
+                        return img;
+                      }
+                      // If it's a file path (starts with /), load and convert to base64
+                      if (img.startsWith('/')) {
+                        try {
+                          const response = await fetch(img);
+                          const blob = await response.blob();
+                          return await new Promise<string>((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result as string);
+                            reader.onerror = reject;
+                            reader.readAsDataURL(blob);
+                          });
+                        } catch (e) {
+                          console.error(`Failed to load image ${img}:`, e);
+                          return img; // Return original path if loading fails
+                        }
+                      }
+                      // If it's a URL, return as is (will be handled by the service)
+                      return img;
+                    }));
+                    result = convertedImages;
+                  } else {
+                    result = imageValue;
+                  }
+                  break;
+                case 'audio-input': 
+                  const audioValue = node.data.value;
+                  // Convert file path to base64 data URL if needed
+                  if (audioValue && typeof audioValue === 'string') {
+                    // If it's already a data URL or base64, return as is
+                    if (audioValue.startsWith('data:') || (!audioValue.startsWith('http') && audioValue.includes(','))) {
+                      result = audioValue;
+                    } else if (audioValue.startsWith('/')) {
+                      // If it's a file path (starts with /), load and convert to base64
+                      try {
+                        const response = await fetch(audioValue);
+                        const blob = await response.blob();
+                        result = await new Promise<string>((resolve, reject) => {
+                          const reader = new FileReader();
+                          reader.onloadend = () => resolve(reader.result as string);
+                          reader.onerror = reject;
+                          reader.readAsDataURL(blob);
+                        });
+                      } catch (e) {
+                        console.error(`Failed to load audio ${audioValue}:`, e);
+                        result = audioValue; // Return original path if loading fails
+                      }
+                    } else {
+                      // If it's a URL or other format, return as is
+                      result = audioValue;
+                    }
+                  } else {
+                    result = audioValue;
+                  }
+                  break;
                 case 'video-input': result = node.data.value; break;
                 case 'web-search': result = await geminiText(nodeInputs['in-text'] || "Search query", true, 'basic', undefined, model); break;
                 case 'gemini-text': 
                   const outputFields = (node.data.customOutputs || []).map((o: any) => ({ id: o.id, description: o.description || o.label }));
-                  // Use DeepSeek for deepseek models, Doubao for doubao models, otherwise use Gemini
+                  // Use DeepSeek for deepseek models, Doubao for doubao models, PP Chat for ppchat models, otherwise use Gemini
                   if (model && model.startsWith('deepseek-')) {
                     result = await deepseekText(nodeInputs['in-text'] || "...", node.data.mode, node.data.customInstruction, model, outputFields);
                   } else if (model && model.startsWith('doubao-')) {
                     const imageInput = nodeInputs['in-image'];
                     result = await doubaoText(nodeInputs['in-text'] || "...", node.data.mode, node.data.customInstruction, model, outputFields, imageInput);
+                  } else if (model && model.startsWith('ppchat-')) {
+                    const imageInput = nodeInputs['in-image'];
+                    result = await ppchatGeminiText(nodeInputs['in-text'] || "...", node.data.mode, node.data.customInstruction, model.replace('ppchat-', ''), outputFields, imageInput);
                   } else {
                   result = await geminiText(nodeInputs['in-text'] || "...", false, node.data.mode, node.data.customInstruction, model, outputFields); 
                   }
@@ -1991,7 +1672,10 @@ Output ONLY the JSON, no additional text or markdown.`;
                       nodeInputs['in-text'] || "",
                       undefined, undefined, undefined,
                       'output_image',
-                      node.data.aspectRatio
+                      node.data.aspectRatio,
+                      undefined,
+                      (taskId) => runningTaskIdsRef.current.set(node.id, taskId),
+                      abortControllerRef.current?.signal
                     );
                   }
                   break;
@@ -2001,23 +1685,27 @@ Output ONLY the JSON, no additional text or markdown.`;
                     const geminiImgs = Array.isArray(nodeInputs['in-image']) ? nodeInputs['in-image'] : (nodeInputs['in-image'] ? [nodeInputs['in-image']] : []);
                     result = await geminiImage(nodeInputs['in-text'] || "Transform", geminiImgs.length > 0 ? geminiImgs : undefined, node.data.aspectRatio || "1:1", model);
                   } else {
-                    // For LightX2V i2i, handle multiple images for storyboard workflow:
-                    // - If multiple images provided, first is previous scene, others are character reference
-                    // - Use previous scene as base image for continuity
-                    // - Character consistency should be emphasized in the prompt (from AI planner)
+                    // For LightX2V i2i, handle multiple images:
+                    // - Server supports multiple images via array input
+                    // - If multiple images provided, pass all of them to the server
+                    // - Server will handle them as input_image_1, input_image_2, etc.
                     const i2iImgs = Array.isArray(nodeInputs['in-image']) ? nodeInputs['in-image'] : (nodeInputs['in-image'] ? [nodeInputs['in-image']] : []);
-                    // Use the first image (previous scene) as base for continuity, character info is in prompt
-                    const baseImg = i2iImgs.length > 0 ? i2iImgs[0] : undefined;
+                    // Pass all images to the server (single image or array of images)
+                    const imageInput = i2iImgs.length === 0 ? undefined : (i2iImgs.length === 1 ? i2iImgs[0] : i2iImgs);
                     result = await lightX2VTask(
                       lightX2VConfig.url, 
                       lightX2VConfig.token, 
                       'i2i', 
                       model || 'Qwen-Image-Edit-2511', 
                       nodeInputs['in-text'] || "",
-                      baseImg,
-                      undefined, undefined,
+                      imageInput,
+                      undefined,
+                      undefined,
                       'output_image',
-                      node.data.aspectRatio
+                      node.data.aspectRatio,
+                      undefined,
+                      (taskId) => runningTaskIdsRef.current.set(node.id, taskId),
+                      abortControllerRef.current?.signal
                     );
                   }
                   break;
@@ -2115,7 +1803,10 @@ Output ONLY the JSON, no additional text or markdown.`;
                     nodeInputs['in-text'] || "",
                     undefined, undefined, undefined,
                     'output_video',
-                    node.data.aspectRatio
+                    node.data.aspectRatio,
+                    undefined,
+                    (taskId) => runningTaskIdsRef.current.set(node.id, taskId),
+                    abortControllerRef.current?.signal
                   );
                   break;
                 case 'video-gen-image':
@@ -2129,7 +1820,10 @@ Output ONLY the JSON, no additional text or markdown.`;
                     startImg,
                     undefined, undefined,
                     'output_video',
-                    node.data.aspectRatio
+                    node.data.aspectRatio,
+                    undefined,
+                    (taskId) => runningTaskIdsRef.current.set(node.id, taskId),
+                    abortControllerRef.current?.signal
                   );
                   break;
                 case 'video-gen-dual-frame':
@@ -2145,7 +1839,10 @@ Output ONLY the JSON, no additional text or markdown.`;
                         undefined,
                         dualEnd,
                         'output_video',
-                        node.data.aspectRatio
+                        node.data.aspectRatio,
+                        undefined,
+                        (taskId) => runningTaskIdsRef.current.set(node.id, taskId),
+                        abortControllerRef.current?.signal
                     );
                     break;
                 case 'character-swap':
@@ -2164,7 +1861,9 @@ Output ONLY the JSON, no additional text or markdown.`;
                       undefined, undefined,
                       'output_video',
                       node.data.aspectRatio,
-                      swapVid
+                      swapVid,
+                      (taskId) => runningTaskIdsRef.current.set(node.id, taskId),
+                      abortControllerRef.current?.signal
                     );
                   } else {
                   result = await geminiVideo(nodeInputs['in-text'] || "Swap character", swapImg, "16:9", "720p", swapVid, model);
@@ -2180,7 +1879,13 @@ Output ONLY the JSON, no additional text or markdown.`;
                     model || "SekoTalk",
                     nodeInputs['in-text'] || "A person talking naturally.", 
                     avatarImg || "", 
-                    avatarAudio || ""
+                    avatarAudio || "",
+                    undefined,
+                    'output_video',
+                    undefined,
+                    undefined,
+                    (taskId) => runningTaskIdsRef.current.set(node.id, taskId),
+                    abortControllerRef.current?.signal
                   );
                   break;
                 default: result = "Processed";
@@ -2220,11 +1925,22 @@ Output ONLY the JSON, no additional text or markdown.`;
               if (errorInfo && errorInfo.error) {
                 // Error was already handled in the catch block, just mark as executed
                 executedInSession.add(errorInfo.nodeId);
-                failedNodes.push({ nodeId: errorInfo.nodeId, error: errorInfo.error, duration: errorInfo.duration || 0 });
+                // Ensure error is a string
+                const errorMessage = errorInfo.error instanceof Error 
+                  ? errorInfo.error.message 
+                  : (typeof errorInfo.error === 'string' 
+                      ? errorInfo.error 
+                      : String(errorInfo.error || 'Unknown execution error'));
+                failedNodes.push({ nodeId: errorInfo.nodeId, error: errorMessage, duration: errorInfo.duration || 0 });
               } else {
                 // Unhandled error
                 const nodeDuration = performance.now() - (node.startTime || performance.now());
-                failedNodes.push({ nodeId: node.id, error: 'Unknown execution error', duration: nodeDuration });
+                const errorMessage = settledResult.reason instanceof Error
+                  ? settledResult.reason.message
+                  : (typeof settledResult.reason === 'string'
+                      ? settledResult.reason
+                      : 'Unknown execution error');
+                failedNodes.push({ nodeId: node.id, error: errorMessage, duration: nodeDuration });
                 executedInSession.add(node.id);
               }
             }
@@ -2347,6 +2063,12 @@ Output ONLY the JSON, no additional text or markdown.`;
     if (!rect) return;
     const x = e.clientX - rect.left, y = e.clientY - rect.top;
     setMousePos({ x, y });
+    
+    // Check if mouse is over a node or port
+    const target = e.target as HTMLElement;
+    const isOverNodeElement = target.closest('.node-element') || target.closest('.port') || target.closest('.connection-path');
+    setIsOverNode(!!isOverNodeElement);
+    
     if (isPanning) { setView(prev => ({ ...prev, x: prev.x + (e.clientX - panStart.x), y: prev.y + (e.clientY - panStart.y) })); setPanStart({ x: e.clientX, y: e.clientY }); }
     else if (draggingNode) { 
         if (selectedRunId) setSelectedRunId(null);
@@ -2395,13 +2117,46 @@ Output ONLY the JSON, no additional text or markdown.`;
                          <div className="space-y-2 relative z-10"><h3 className="text-lg font-black text-slate-200 group-hover:text-white transition-colors truncate">{w.name}</h3><div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest"><Calendar size={10}/> {new Date(w.updatedAt).toLocaleDateString()}</div></div>
                       </div>
                     )))}
-                 {activeTab === 'PRESET' && (PRESET_WORKFLOWS.map(w => (
-                      <div key={w.id} onClick={() => openWorkflow(w)} className="group bg-slate-900/50 border border-slate-800 hover:border-emerald-500/50 rounded-[32px] p-6 flex flex-col justify-between h-56 transition-all hover:shadow-2xl hover:shadow-emerald-500/10 cursor-pointer relative overflow-hidden active:scale-95">
-                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                         <div className="flex justify-between items-start relative z-10"><div className="p-3 bg-slate-800 group-hover:bg-emerald-600 rounded-2xl text-slate-500 group-hover:text-white transition-all shadow-inner"><Sparkle size={20}/></div><span className="text-[8px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded-full border border-emerald-500/20">{t('system_preset')}</span></div>
-                         <div className="space-y-2 relative z-10"><h3 className="text-lg font-black text-slate-200 group-hover:text-white transition-colors truncate">{w.name}</h3><p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest line-clamp-1">{lang === 'zh' ? '多模态自动化创作流水线' : 'Automated multi-modal pipeline'}</p></div>
+                 {activeTab === 'PRESET' && (PRESET_WORKFLOWS.map(w => {
+                      // Extract preview content from workflow
+                      const textInputNode = w.nodes.find(n => n.toolId === 'text-prompt' && n.data?.value);
+                      const imageInputNode = w.nodes.find(n => n.toolId === 'image-input' && n.data?.value && Array.isArray(n.data.value) && n.data.value.length > 0);
+                      const audioInputNode = w.nodes.find(n => n.toolId === 'audio-input' && n.data?.value);
+                      
+                      const previewText = textInputNode?.data?.value || null;
+                      const previewImage = imageInputNode?.data?.value?.[0] || null;
+                      
+                      return (
+                      <div key={w.id} onClick={() => openWorkflow(w)} className="group bg-slate-900/50 border border-slate-800 hover:border-emerald-500/50 rounded-[32px] p-6 flex flex-col transition-all hover:shadow-2xl hover:shadow-emerald-500/10 cursor-pointer relative active:scale-95">
+                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-[32px]"></div>
+                         <div className="flex justify-between items-start relative z-10 mb-3 flex-shrink-0"><div className="p-3 bg-slate-800 group-hover:bg-emerald-600 rounded-2xl text-slate-500 group-hover:text-white transition-all shadow-inner"><Sparkle size={20}/></div><span className="text-[8px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded-full border border-emerald-500/20">{t('system_preset')}</span></div>
+                         <div className="space-y-3 relative z-10 flex flex-col min-h-0">
+                           {/* Preview content */}
+                           {previewImage ? (
+                             <div className="w-full aspect-[3/4] rounded-xl overflow-hidden bg-slate-800/50 flex items-center justify-center flex-shrink-0">
+                               <img 
+                                 src={previewImage.startsWith('/') ? previewImage : (previewImage.startsWith('data:') ? previewImage : `data:image/png;base64,${previewImage}`)} 
+                                 alt="Preview" 
+                                 className="w-full h-full object-cover"
+                                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                               />
                       </div>
-                    )))}
+                           ) : previewText ? (
+                             <div className="w-full aspect-[3/4] rounded-xl overflow-hidden bg-slate-800/50 p-4 flex items-center justify-center flex-shrink-0">
+                               <p className="text-xs text-slate-300 line-clamp-6 leading-relaxed text-center">{previewText}</p>
+                             </div>
+                           ) : (
+                             <div className="w-full aspect-[3/4] rounded-xl bg-slate-800/50 flex-shrink-0"></div>
+                           )}
+                           {/* Title below preview */}
+                           <div className="flex flex-col space-y-1 flex-shrink-0">
+                             <h3 className="text-lg font-black text-slate-200 group-hover:text-white transition-colors truncate">{w.name}</h3>
+                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest line-clamp-1">{lang === 'zh' ? '多模态自动化创作流水线' : 'Automated multi-modal pipeline'}</p>
+                           </div>
+                         </div>
+                      </div>
+                      );
+                    }))}
               </div>
            </div>
         </main>
@@ -2593,12 +2348,6 @@ Output ONLY the JSON, no additional text or markdown.`;
               >
                 {lang === 'zh' ? '关闭' : 'Close'}
               </button>
-              <button 
-                onClick={() => window.location.reload()} 
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
-              >
-                {lang === 'zh' ? '刷新页面' : 'Reload Page'}
-              </button>
             </div>
           </div>
         </div>
@@ -2760,13 +2509,13 @@ Output ONLY the JSON, no additional text or markdown.`;
                </button>
              </div>
              {['Input', 'AI Model', 'Image Processing'].map(cat => (
-               <div key={cat} className="space-y-2.5">
+             <div key={cat} className="space-y-2.5">
                  <span className="text-[9px] text-slate-600 font-black uppercase">{lang === 'zh' ? (cat === 'Input' ? '输入' : cat === 'AI Model' ? 'AI 模型' : '图像处理') : cat}</span>
-                 {TOOLS.filter(t => t.category === cat).map(tool => (
-                   <div key={tool.id} onClick={() => addNode(tool)} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-800/20 border border-slate-800/60 hover:border-indigo-500/40 hover:bg-slate-800/40 cursor-pointer transition-all active:scale-95 group"><div className="p-2.5 rounded-xl bg-slate-800 group-hover:bg-indigo-600 group-hover:text-white transition-colors">{React.createElement(getIcon(tool.icon), { size: 16 })}</div><div className="flex flex-col"><span className="text-xs font-bold text-slate-300">{lang === 'zh' ? tool.name_zh : tool.name}</span><span className="text-[9px] text-slate-500 line-clamp-1">{lang === 'zh' ? tool.description_zh : tool.description}</span></div></div>
-                 ))}
-               </div>
-             ))}
+               {TOOLS.filter(t => t.category === cat).map(tool => (
+                 <div key={tool.id} onClick={() => addNode(tool)} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-800/20 border border-slate-800/60 hover:border-indigo-500/40 hover:bg-slate-800/40 cursor-pointer transition-all active:scale-95 group"><div className="p-2.5 rounded-xl bg-slate-800 group-hover:bg-indigo-600 group-hover:text-white transition-colors">{React.createElement(getIcon(tool.icon), { size: 16 })}</div><div className="flex flex-col"><span className="text-xs font-bold text-slate-300">{lang === 'zh' ? tool.name_zh : tool.name}</span><span className="text-[9px] text-slate-500 line-clamp-1">{lang === 'zh' ? tool.description_zh : tool.description}</span></div></div>
+               ))}
+             </div>
+           ))}
           </div>
           {sidebarCollapsed && (
             <button
@@ -2782,9 +2531,11 @@ Output ONLY the JSON, no additional text or markdown.`;
         <main 
           ref={canvasRef} 
           className="flex-1 relative overflow-hidden canvas-grid bg-[#0a0f1e]" 
+          style={{ cursor: isOverNode ? 'default' : (isPanning ? 'grabbing' : 'grab') }}
           onMouseMove={handleMouseMove} 
           onMouseUp={() => { setDraggingNode(null); setConnecting(null); setIsPanning(false); }} 
-          onMouseDown={handleMouseDown} 
+          onMouseDown={handleMouseDown}
+          onMouseLeave={() => setIsOverNode(false)} 
           onWheel={e => {
             // Detect zoom gesture:
             // 1. Ctrl/Cmd + wheel (desktop zoom)
@@ -2838,8 +2589,28 @@ Output ONLY the JSON, no additional text or markdown.`;
                 const tNode = sourceNodes.find(n => n.id === c.targetNodeId);
                 if (!sNode || !tNode) return null;
                 const sOutputs = getNodeOutputs(sNode), tInputs = (TOOLS.find(t => t.id === tNode.toolId))?.inputs || [];
-                const x1 = sNode.x + 224, y1 = sNode.y + 64 + (sOutputs.findIndex(p => p.id === c.sourcePortId) * 32);
-                const x2 = tNode.x, y2 = tNode.y + 64 + (tInputs.findIndex(p => p.id === c.targetPortId) * 32);
+                // Port positions calculation:
+                // - Node width: w-56 = 224px (14rem * 16px = 224px)
+                // - Output ports: absolute -right-[24px], w-3 h-3 (12px), center at node.x + 224 - 24 + 6 = node.x + 206
+                // - Input ports: absolute -left-[24px], w-3 h-3 (12px), center at node.x - 24 + 6 = node.x - 18
+                // - Header: px-4 py-3 = 16px (left/right) + 12px (top/bottom) + ~24px (content) ≈ 48px total height
+                // - Content area: p-4 = 16px padding on all sides
+                // - Port rows: flex items-center, space-y-4 (16px gap between rows)
+                // - Each port row: text-[9px] font-bold ≈ 14px line-height, with items-center alignment
+                // - First port center Y: node.y + 48 (header) + 16 (top padding) + 7 (half row height) = node.y + 71
+                // - Port spacing: row height (~14px) + space-y-4 gap (16px) = 30px between port centers
+                const outputPortIndex = sOutputs.findIndex(p => p.id === c.sourcePortId);
+                const inputPortIndex = tInputs.findIndex(p => p.id === c.targetPortId);
+                const x1 = sNode.x + 224; // Output port center X
+                // Output ports are positioned from bottom: last index (n-1) at bottom, first index (0) at top
+                // Estimate node height: header (48px) + content padding top (16px) + outputs area + content padding bottom (16px)
+                // Output ports area: (outputPortCount - 1) * 30px (spacing) + padding
+                // For nodes with outputs, estimate height based on output count, minimum ~140px for basic nodes
+                const nodeHeight = nodeHeightsRef.current.get(sNode.id) || Math.max(140, 48 + 16 + Math.max(0, (sOutputs.length - 1) * 30) + 30 + 16);
+                const nodeBottomY = sNode.y + nodeHeight;
+                const y1 = nodeBottomY - ((sOutputs.length - 1 - outputPortIndex) * 30) - 24; // Output port center Y (7px offset from bottom)
+                const x2 = tNode.x; // Input port center X
+                const y2 = tNode.y + 71 + (inputPortIndex * 30); // Input port center Y
                 const path = `M ${x1} ${y1} C ${x1 + 100} ${y1}, ${x2 - 100} ${y2}, ${x2} ${y2}`;
                 const isSelected = selectedConnectionId === c.id;
                 const isTargetRunning = tNode.status === NodeStatus.RUNNING;
@@ -2892,9 +2663,10 @@ Output ONLY the JSON, no additional text or markdown.`;
 
               const isInputNode = tool.category === 'Input';
               const hasData = (isInputNode && node.data.value && (Array.isArray(node.data.value) ? node.data.value.length > 0 : true)) || (!isInputNode && sourceOutputs[node.id]);
+              const shouldShowPreview = hasData && node.toolId !== 'text-prompt'; // Don't show preview for text input nodes
 
               return (
-                <div key={node.id} className={`node-element absolute w-56 bg-slate-900 border rounded-3xl shadow-2xl transition-all z-10 group ${isSelected ? 'border-indigo-500 ring-8 ring-indigo-500/10' : 'border-slate-800'}`} style={{ left: node.x, top: node.y }} onClick={e => { 
+                <div key={node.id} ref={(el) => { if (el) nodeHeightsRef.current.set(node.id, el.offsetHeight); }} className={`node-element absolute w-56 bg-slate-900 border rounded-3xl shadow-2xl transition-all z-10 group ${isSelected ? 'border-indigo-500 ring-8 ring-indigo-500/10' : 'border-slate-800'}`} style={{ left: node.x, top: node.y }} onClick={e => { 
                   e.stopPropagation(); 
                   if (selectedRunId) setSelectedRunId(null);
                   setSelectedNodeId(node.id); 
@@ -2960,13 +2732,13 @@ Output ONLY the JSON, no additional text or markdown.`;
                   )}
 
                   <div className={`px-4 py-3 border-b flex items-center justify-between bg-slate-800/40 rounded-t-3xl ${node.status === NodeStatus.RUNNING ? 'animate-pulse bg-indigo-500/10 border-indigo-500/20' : ''}`}>
-                    <div className="flex items-center gap-2 truncate">
-                      <div className={`p-1.5 rounded-lg ${node.status === NodeStatus.RUNNING ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                    <div className="flex items-center gap-2 truncate flex-1 min-w-0">
+                      <div className={`p-1.5 rounded-lg shrink-0 ${node.status === NodeStatus.RUNNING ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
                         {React.createElement(getIcon(tool.icon), { size: 10 })}
                       </div>
                       <span className="text-[10px] font-black uppercase truncate tracking-widest">{lang === 'zh' ? tool.name_zh : tool.name}</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 shrink-0">
                        {(node.status === NodeStatus.RUNNING || node.executionTime !== undefined) && (
                          <span className={`text-[8px] font-bold ${node.status === NodeStatus.RUNNING ? 'text-indigo-400' : 'text-slate-500'}`}>
                            {durationText}
@@ -3100,12 +2872,53 @@ Output ONLY the JSON, no additional text or markdown.`;
                           <div className="port w-3 h-3 rounded-full bg-slate-800 border-2 border-slate-950 absolute -left-[24px] cursor-crosshair hover:bg-indigo-500 transition-colors" onMouseDown={e => { e.stopPropagation(); const rect = e.currentTarget.getBoundingClientRect(), cr = canvasRef.current!.getBoundingClientRect(); const viewX = rect.left + rect.width / 2 - cr.left, viewY = rect.top + rect.height / 2 - cr.top; const world = screenToWorld(viewX, viewY); setConnecting({ nodeId: node.id, portId: p.id, type: p.type, direction: 'in', startX: world.x, startY: world.y }); }} onMouseUp={() => { if (connecting && connecting.direction === 'out' && connecting.type === p.type) { if (selectedRunId) setSelectedRunId(null); setWorkflow(p_prev => p_prev ? ({ ...p_prev, connections: [...p_prev.connections, { id: `conn-${Date.now()}`, sourceNodeId: connecting.nodeId, sourcePortId: connecting.portId, targetNodeId: node.id, targetPortId: p.id }], isDirty: true }) : null); } }} /><span className="truncate">{p.label}</span></div>
                       );
                     })}
-                    {outputs.map(p => (
-                      <div key={p.id} className="flex items-center justify-end gap-2 text-[9px] font-bold text-slate-500 relative"><span className="truncate">{p.label}</span><div className="port w-3 h-3 rounded-full bg-slate-800 border-2 border-slate-950 absolute -right-[24px] cursor-crosshair hover:bg-indigo-500 transition-colors" onMouseDown={e => { e.stopPropagation(); const rect = e.currentTarget.getBoundingClientRect(), cr = canvasRef.current!.getBoundingClientRect(); const viewX = rect.left + rect.width / 2 - cr.left, viewY = rect.top + rect.height / 2 - cr.top; const world = screenToWorld(viewX, viewY); setConnecting({ nodeId: node.id, portId: p.id, type: p.type, direction: 'out', startX: world.x, startY: world.y }); }} onMouseUp={() => { if (connecting && connecting.direction === 'in' && connecting.type === p.type) { if (selectedRunId) setSelectedRunId(null); setWorkflow(p_prev => p_prev ? ({ ...p_prev, connections: [...p_prev.connections, { id: `conn-${Date.now()}`, sourceNodeId: node.id, sourcePortId: p.id, targetNodeId: connecting.nodeId, targetPortId: connecting.portId }], isDirty: true }) : null); } }} /></div>
-                    ))}
+                    {outputs.map(p => {
+                      const isConnected = workflow.connections.some(c => c.sourceNodeId === node.id && c.sourcePortId === p.id);
+                      const compatibleTools = getCompatibleToolsForOutput(p.type);
+                      const quickAddKey = `${node.id}-${p.id}`;
+                      const showMenu = showOutputQuickAdd?.nodeId === node.id && showOutputQuickAdd?.portId === p.id;
+                      return (
+                        <div key={p.id} className="flex items-center justify-end gap-2 text-[9px] font-bold text-slate-500 relative group/port">
+                          {!isConnected && compatibleTools.length > 0 && (
+                            <button 
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setShowOutputQuickAdd(showMenu ? null : { nodeId: node.id, portId: p.id });
+                              }} 
+                              className="opacity-0 group-hover/port:opacity-100 transition-opacity p-1 bg-indigo-600 text-white rounded-lg absolute -right-12 z-20 shadow-xl hover:bg-indigo-500 active:scale-90 flex items-center justify-center"
+                              title={lang === 'zh' ? '快速添加节点' : 'Quick Add Node'}
+                            >
+                              <Plus size={14}/>
+                            </button>
+                          )}
+                          {showMenu && (
+                            <div className="absolute top-0 left-full ml-2 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-30 max-h-64 overflow-y-auto custom-scrollbar output-quick-add-menu" onClick={(e) => e.stopPropagation()}>
+                              {compatibleTools.map(tool => (
+                                <button
+                                  key={tool.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    quickAddOutput(node, p, tool.id);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-xs text-slate-300 hover:bg-indigo-500/20 hover:text-white transition-colors flex items-center gap-2"
+                                >
+                                  <div className="p-1 rounded bg-slate-700">
+                                    {React.createElement(getIcon(tool.icon), { size: 12 })}
+                                  </div>
+                                  <span>{lang === 'zh' ? tool.name_zh : tool.name}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          <span className="truncate">{p.label}</span>
+                          <div className="port w-3 h-3 rounded-full bg-slate-800 border-2 border-slate-950 absolute -right-[24px] cursor-crosshair hover:bg-indigo-500 transition-colors" onMouseDown={e => { e.stopPropagation(); const rect = e.currentTarget.getBoundingClientRect(), cr = canvasRef.current!.getBoundingClientRect(); const viewX = rect.left + rect.width / 2 - cr.left, viewY = rect.top + rect.height / 2 - cr.top; const world = screenToWorld(viewX, viewY); setConnecting({ nodeId: node.id, portId: p.id, type: p.type, direction: 'out', startX: world.x, startY: world.y }); }} onMouseUp={() => { if (connecting && connecting.direction === 'in' && connecting.type === p.type) { if (selectedRunId) setSelectedRunId(null); setWorkflow(p_prev => p_prev ? ({ ...p_prev, connections: [...p_prev.connections, { id: `conn-${Date.now()}`, sourceNodeId: node.id, sourcePortId: p.id, targetNodeId: connecting.nodeId, targetPortId: connecting.portId }], isDirty: true }) : null); } }} />
+                        </div>
+                      );
+                    })}
                   </div>
 
-                  {hasData && (
+                  {shouldShowPreview && (
                     <div 
                       onClick={(e) => { e.stopPropagation(); setExpandedOutput({ nodeId: node.id }); }}
                       onMouseDown={(e) => e.stopPropagation()}
@@ -3156,6 +2969,121 @@ Output ONLY the JSON, no additional text or markdown.`;
                       </div>
                     </div>
                   )}
+                  
+                  {/* Model and Voice Selectors - positioned below node on the left */}
+                  <div className="absolute top-full left-0 mt-2 flex items-center gap-2 z-20">
+                    {/* Model selector for nodes with models */}
+                    {tool.models && tool.models.length > 0 && (
+                      <div className="relative model-select-container">
+                        <button
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowModelSelect(showModelSelect === node.id ? null : node.id);
+                            setShowVoiceSelect(null);
+                          }}
+                          className="px-2 py-1 text-[9px] font-bold bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-md transition-colors flex items-center gap-1 shadow-lg"
+                          title={lang === 'zh' ? '选择模型' : 'Select Model'}
+                        >
+                          <span className="truncate max-w-[80px]">{tool.models.find(m => m.id === node.data.model)?.name || tool.models[0]?.name || 'Model'}</span>
+                          <ChevronDown size={10} className={showModelSelect === node.id ? 'rotate-180' : ''} />
+                        </button>
+                        {showModelSelect === node.id && (
+                          <div className="absolute top-full left-0 mt-1 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-30 max-h-64 overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
+                            {tool.models.map(model => (
+                              <button
+                                key={model.id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateNodeData(node.id, 'model', model.id);
+                                  setShowModelSelect(null);
+                                }}
+                                className={`w-full px-4 py-2 text-left text-xs transition-colors flex items-center gap-2 ${node.data.model === model.id ? 'bg-indigo-500/20 text-white' : 'text-slate-300 hover:bg-indigo-500/20 hover:text-white'}`}
+                              >
+                                <span>{model.name}</span>
+                                {node.data.model === model.id && <CheckCircle2 size={12} className="ml-auto" />}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {/* Voice selector for TTS nodes with lightx2v model */}
+                    {node.toolId === 'tts' && (node.data.model === 'lightx2v' || node.data.model?.startsWith('lightx2v')) && lightX2VVoiceList?.voices && (
+                      <div className="relative voice-select-container">
+                        <button
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowVoiceSelect(showVoiceSelect === node.id ? null : node.id);
+                            setShowModelSelect(null);
+                          }}
+                          className="px-2 py-1 text-[9px] font-bold bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-md transition-colors flex items-center gap-1 shadow-lg"
+                          title={lang === 'zh' ? '选择音色' : 'Select Voice'}
+                        >
+                          <span className="truncate max-w-[80px]">{lightX2VVoiceList.voices.find((v: any) => v.voice_type === node.data.voiceType)?.name || node.data.voiceType || 'Voice'}</span>
+                          <ChevronDown size={10} className={showVoiceSelect === node.id ? 'rotate-180' : ''} />
+                        </button>
+                        {showVoiceSelect === node.id && (
+                          <div className="absolute top-full left-0 mt-1 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-30 max-h-64 overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
+                            {lightX2VVoiceList.voices.map((voice: any) => (
+                              <button
+                                key={voice.voice_type}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateNodeData(node.id, 'voiceType', voice.voice_type);
+                                  if (voice.resource_id) {
+                                    updateNodeData(node.id, 'resourceId', voice.resource_id);
+                                  }
+                                  setShowVoiceSelect(null);
+                                }}
+                                className={`w-full px-4 py-2 text-left text-xs transition-colors flex items-center gap-2 ${node.data.voiceType === voice.voice_type ? 'bg-indigo-500/20 text-white' : 'text-slate-300 hover:bg-indigo-500/20 hover:text-white'}`}
+                              >
+                                <span className="truncate">{voice.name || voice.voice_type}</span>
+                                {node.data.voiceType === voice.voice_type && <CheckCircle2 size={12} className="ml-auto" />}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {/* Voice selector for voice clone nodes */}
+                    {node.toolId === 'lightx2v-voice-clone' && cloneVoiceList.length > 0 && (
+                      <div className="relative voice-select-container">
+                        <button
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowVoiceSelect(showVoiceSelect === node.id ? null : node.id);
+                            setShowModelSelect(null);
+                          }}
+                          className="px-2 py-1 text-[9px] font-bold bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-md transition-colors flex items-center gap-1 shadow-lg"
+                          title={lang === 'zh' ? '选择克隆音色' : 'Select Clone Voice'}
+                        >
+                          <span className="truncate max-w-[80px]">{cloneVoiceList.find(v => v.speaker_id === node.data.speakerId)?.name || node.data.speakerId || 'Voice'}</span>
+                          <ChevronDown size={10} className={showVoiceSelect === node.id ? 'rotate-180' : ''} />
+                        </button>
+                        {showVoiceSelect === node.id && (
+                          <div className="absolute top-full left-0 mt-1 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-30 max-h-64 overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
+                            {cloneVoiceList.map((voice: any) => (
+                              <button
+                                key={voice.speaker_id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateNodeData(node.id, 'speakerId', voice.speaker_id);
+                                  setShowVoiceSelect(null);
+                                }}
+                                className={`w-full px-4 py-2 text-left text-xs transition-colors flex items-center gap-2 ${node.data.speakerId === voice.speaker_id ? 'bg-indigo-500/20 text-white' : 'text-slate-300 hover:bg-indigo-500/20 hover:text-white'}`}
+                              >
+                                <span className="truncate">{voice.name || voice.speaker_id}</span>
+                                {node.data.speakerId === voice.speaker_id && <CheckCircle2 size={12} className="ml-auto" />}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -3587,7 +3515,7 @@ Output ONLY the JSON, no additional text or markdown.`;
                                 <span className="text-[8px] text-slate-500">
                                   {lang === 'zh' ? '来自' : 'From'}: {lang === 'zh' ? TOOLS.find(t => t.id === sourceNode.toolId)?.name_zh : TOOLS.find(t => t.id === sourceNode.toolId)?.name} → {port.label}
                                 </span>
-                              </div>
+                </div>
                               {overrideValue !== undefined && (
                                 <button
                                   onClick={() => {
@@ -3601,7 +3529,7 @@ Output ONLY the JSON, no additional text or markdown.`;
                                   <RefreshCw size={12} />
                                 </button>
                               )}
-                            </div>
+             </div>
                             <textarea
                               value={displayValue}
                               onChange={e => {
@@ -3616,11 +3544,11 @@ Output ONLY the JSON, no additional text or markdown.`;
                               <div className="flex items-center gap-2 text-[8px] text-amber-400">
                                 <AlertCircle size={10} />
                                 <span>{lang === 'zh' ? '已修改，将使用此值覆盖连接的值' : 'Modified: This value will override the connected value'}</span>
-                              </div>
-                            )}
-                          </div>
-                        ))}
                       </div>
+                            )}
+                      </div>
+                        ))}
+                   </div>
                     );
                   })()}
                 </div>
@@ -3702,31 +3630,31 @@ Output ONLY the JSON, no additional text or markdown.`;
               </button>
               {!resultsCollapsed && (
                 <>
-                  <div className="h-4 w-px bg-slate-800"></div>
-                  <button 
-                    onClick={() => setWorkflow(p => p ? ({ ...p, showIntermediateResults: !p.showIntermediateResults }) : null)}
-                    className="flex items-center gap-2 text-[9px] font-black uppercase text-slate-400 hover:text-indigo-300 transition-all"
-                  >
-                    {workflow.showIntermediateResults ? <ToggleRight size={16} className="text-indigo-500" /> : <ToggleLeft size={16} />}
-                    {t('show_intermediate')}
-                  </button>
+              <div className="h-4 w-px bg-slate-800"></div>
+              <button 
+                onClick={() => setWorkflow(p => p ? ({ ...p, showIntermediateResults: !p.showIntermediateResults }) : null)}
+                className="flex items-center gap-2 text-[9px] font-black uppercase text-slate-400 hover:text-indigo-300 transition-all"
+              >
+                {workflow.showIntermediateResults ? <ToggleRight size={16} className="text-indigo-500" /> : <ToggleLeft size={16} />}
+                {t('show_intermediate')}
+              </button>
                 </>
               )}
            </div>
            {!resultsCollapsed && (
-             <div className="flex gap-4">
-               {workflow.history.map(r => (
-                 <button key={r.id} onClick={() => setSelectedRunId(r.id)} className={`group relative px-4 py-1.5 rounded-full text-[9px] font-bold border transition-all ${selectedRunId === r.id ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
-                   {new Date(r.timestamp).toLocaleTimeString()}
-                   {r.totalTime !== undefined && (
-                     <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 text-[8px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-xl">
-                        {t('run_time')}: {formatTime(r.totalTime)}
-                     </span>
-                   )}
-                 </button>
-               ))}
-               {selectedRunId && <button onClick={() => setSelectedRunId(null)} className="p-1.5 text-slate-500 hover:text-white transition-all active:scale-90"><RefreshCw size={14}/></button>}
-             </div>
+           <div className="flex gap-4">
+             {workflow.history.map(r => (
+               <button key={r.id} onClick={() => setSelectedRunId(r.id)} className={`group relative px-4 py-1.5 rounded-full text-[9px] font-bold border transition-all ${selectedRunId === r.id ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
+                 {new Date(r.timestamp).toLocaleTimeString()}
+                 {r.totalTime !== undefined && (
+                   <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 text-[8px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-xl">
+                      {t('run_time')}: {formatTime(r.totalTime)}
+                   </span>
+                 )}
+               </button>
+             ))}
+             {selectedRunId && <button onClick={() => setSelectedRunId(null)} className="p-1.5 text-slate-500 hover:text-white transition-all active:scale-90"><RefreshCw size={14}/></button>}
+           </div>
            )}
         </div>
         {!resultsCollapsed && (
