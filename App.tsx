@@ -704,14 +704,111 @@ Output ONLY the JSON, no additional text or markdown.`;
   }, [selectedNodeId, workflow?.nodes.find(n => n.id === selectedNodeId)?.data?.model]);
 
   const saveWorkflowToLocal = useCallback((current: WorkflowState) => {
-    const updated = { ...current, updatedAt: Date.now(), isDirty: false };
+    // Clean history to remove base64 data but keep URLs before saving to avoid localStorage quota issues
+    const cleanedHistory = current.history.map(run => {
+      const cleanedOutputs: Record<string, any> = {};
+      // Keep URLs, but remove base64 data (data:image/..., data:video/..., data:audio/...)
+      Object.entries(run.outputs || {}).forEach(([nodeId, output]) => {
+        if (Array.isArray(output)) {
+          cleanedOutputs[nodeId] = output.map((item: any) => {
+            if (typeof item === 'string' && item.startsWith('data:')) {
+              // Remove base64 data URLs
+              return '';
+            }
+            return item; // Keep URLs (http/https) and other non-base64 data
+          }).filter((item: any) => item !== '');
+        } else if (typeof output === 'string') {
+          if (output.startsWith('data:')) {
+            // Remove base64 data URLs
+            cleanedOutputs[nodeId] = '';
+          } else {
+            // Keep regular URLs (http/https)
+            cleanedOutputs[nodeId] = output;
+          }
+        } else {
+          cleanedOutputs[nodeId] = output;
+        }
+      });
+      // Only keep outputs that have non-empty values
+      Object.keys(cleanedOutputs).forEach(key => {
+        if (cleanedOutputs[key] === '' || (Array.isArray(cleanedOutputs[key]) && cleanedOutputs[key].length === 0)) {
+          delete cleanedOutputs[key];
+        }
+      });
+      
+      return {
+        id: run.id,
+        timestamp: run.timestamp,
+        totalTime: run.totalTime,
+        nodesSnapshot: run.nodesSnapshot,
+        outputs: cleanedOutputs // Keep URLs, remove base64 data
+      };
+    });
+    
+    const updated = { 
+      ...current, 
+      updatedAt: Date.now(), 
+      isDirty: false,
+      history: cleanedHistory
+    };
+    
     setMyWorkflows(prev => {
       const next = prev.find(w => w.id === updated.id) ? prev.map(w => w.id === updated.id ? updated : w) : [updated, ...prev];
-      localStorage.setItem('omniflow_user_data', JSON.stringify(next));
+      
+      try {
+        localStorage.setItem('omniflow_user_data', JSON.stringify(next));
+      } catch (e: any) {
+        if (e.name === 'QuotaExceededError' || e.code === 22) {
+          // If still too large, try to clean all workflows' history
+          const fullyCleaned = next.map(w => ({
+            ...w,
+            history: w.history.map(run => {
+              const cleanedOutputs: Record<string, any> = {};
+              Object.entries(run.outputs || {}).forEach(([nodeId, output]) => {
+                if (Array.isArray(output)) {
+                  cleanedOutputs[nodeId] = output.map((item: any) => {
+                    if (typeof item === 'string' && item.startsWith('data:')) {
+                      return '';
+                    }
+                    return item;
+                  }).filter((item: any) => item !== '');
+                } else if (typeof output === 'string') {
+                  if (!output.startsWith('data:')) {
+                    cleanedOutputs[nodeId] = output;
+                  }
+                } else {
+                  cleanedOutputs[nodeId] = output;
+                }
+              });
+              Object.keys(cleanedOutputs).forEach(key => {
+                if (cleanedOutputs[key] === '' || (Array.isArray(cleanedOutputs[key]) && cleanedOutputs[key].length === 0)) {
+                  delete cleanedOutputs[key];
+                }
+              });
+              return {
+                id: run.id,
+                timestamp: run.timestamp,
+                totalTime: run.totalTime,
+                nodesSnapshot: run.nodesSnapshot,
+                outputs: cleanedOutputs
+              };
+            })
+          }));
+          try {
+            localStorage.setItem('omniflow_user_data', JSON.stringify(fullyCleaned));
+          } catch (e2: any) {
+            console.error('Failed to save workflow: localStorage quota exceeded', e2);
+            alert(lang === 'zh' ? '保存失败：存储空间不足。请删除一些工作流或清除浏览器数据。' : 'Save failed: Storage quota exceeded. Please delete some workflows or clear browser data.');
+            return prev; // Return previous state on error
+          }
+        } else {
+          throw e;
+        }
+      }
       return next;
     });
     setWorkflow(updated);
-  }, []);
+  }, [lang]);
 
   const deleteWorkflow = useCallback((id: string, e: React.MouseEvent) => {
     e.stopPropagation();
