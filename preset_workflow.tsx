@@ -3,9 +3,78 @@
 import { WorkflowState, NodeStatus } from './types';
 
 export const PRESET_WORKFLOWS: WorkflowState[] = [
+  {
+    id: 'preset-knowledge-ip',
+    name: '知识IP口播工作流',
+    updatedAt: Date.now(),
+    isDirty: false,
+    isRunning: false,
+    env: {
+      lightx2v_url: "",
+      lightx2v_token: ""
+    },
+    globalInputs: {},
+    history: [],
+    showIntermediateResults: true,
+    connections: [
+      { id: 'c1', sourceNodeId: 'ip-node-url', sourcePortId: 'out-text', targetNodeId: 'ip-node-ai', targetPortId: 'in-text' },
+      { id: 'c2', sourceNodeId: 'ip-node-image-ref', sourcePortId: 'out-image', targetNodeId: 'ip-node-ai', targetPortId: 'in-image' },
+      { id: 'c3', sourceNodeId: 'ip-node-ai', sourcePortId: 'tts_text', targetNodeId: 'ip-node-tts', targetPortId: 'in-text' },
+      { id: 'c4', sourceNodeId: 'ip-node-ai', sourcePortId: 'voice_style', targetNodeId: 'ip-node-tts', targetPortId: 'in-context-tone' },
+      { id: 'c5', sourceNodeId: 'ip-node-image-ref', sourcePortId: 'out-image', targetNodeId: 'ip-node-avatar', targetPortId: 'in-image' },
+      { id: 'c6', sourceNodeId: 'ip-node-tts', sourcePortId: 'out-audio', targetNodeId: 'ip-node-avatar', targetPortId: 'in-audio' },
+      { id: 'c7', sourceNodeId: 'ip-node-ai', sourcePortId: 's2v_prompt', targetNodeId: 'ip-node-avatar', targetPortId: 'in-text' }
+    ],
+    nodes: [
+      { id: 'ip-node-url', toolId: 'text-prompt', x: 50, y: 200, status: NodeStatus.IDLE, data: { value: "https://github.com/ModelTC/LightX2V/blob/main/README_zh.md" } },
+      { id: 'ip-node-image-ref', toolId: 'image-input', x: 50, y: 400, status: NodeStatus.IDLE, data: { value: ['/assets/programmer.png'] } },
+      { id: 'ip-node-ai', toolId: 'gemini-text', x: 450, y: 300, status: NodeStatus.IDLE, data: { 
+          model: 'doubao-seed-1-6-vision-250815',
+          mode: 'custom',
+          useSearch: true,
+          customInstruction: `你是一位专业的知识IP口播视频创意总监。你的任务是根据输入的网页链接内容和数字人参考图片，生成完整的知识IP口播视频组件。
+
+重要原则：
+- 生成结果中的所有字段语言必须跟随用户输入的语言。如果用户使用中文输入，所有输出字段（tts_text、voice_style、s2v_prompt）都必须使用中文；如果用户使用英文输入，则所有输出字段都使用英文。
+- 你需要访问用户提供的网页链接，提取网页的核心内容，理解其主题和关键信息。使用联网搜索功能获取网页内容。
+- 用户会提供参考图片，直接使用该图片作为数字人形象，不需要生成或修改图片。
+
+对于 tts_text（口播文案）：
+- 根据网页链接的内容，提取核心知识点和关键信息
+- 将网页内容转化为自然、流畅的口播文案
+- 文案应该结构清晰，逻辑性强，易于理解
+- 使用口语化的表达方式，适合口播
+- 长度应适合数字人视频使用（正常语速下约30-60秒）
+- 确保文案准确传达网页的核心内容，同时保持吸引力和可理解性
+
+对于 voice_style（语气指令）：
+- 根据知识IP的定位和内容特点，提供相应的配音指导
+- 知识IP通常需要专业、清晰、有说服力的语调
+- 描述配音应该体现的风格、情感、语气等特点
+- 确保语调指令与口播文案内容相匹配
+- 可以包含节奏、重音、停顿等具体指导
+
+对于 s2v_prompt（数字人视频动作提示）：
+- 描述自然、真实的说话手势和动作
+- 包含头部动作（点头、倾斜、轻微转动）
+- 描述与语音内容和情感语调匹配的面部表情
+- 知识IP可以有一些专业的手势，如指向、展示等
+- 指定眼神接触和视线方向
+- 确保动作与语音节奏同步
+- 足够详细，以指导数字人视频生成自然、逼真的效果`,
+          customOutputs: [
+            { id: 'tts_text', label: '口播文案', description: '根据网页内容生成的口播文案。' },
+            { id: 'voice_style', label: '语气指令', description: '根据知识IP定位生成的配音指导。' },
+            { id: 's2v_prompt', label: 'S2V提示词', description: '数字人视频动作和运动的描述。' }
+          ]
+      } },
+      { id: 'ip-node-tts', toolId: 'tts', x: 900, y: 300, status: NodeStatus.IDLE, data: { model: 'lightx2v', voiceType: 'zh_female_vv_uranus_bigtts', resourceId: 'seed-tts-2.0' } },
+      { id: 'ip-node-avatar', toolId: 'avatar-gen', x: 1500, y: 200, status: NodeStatus.IDLE, data: { model: 'SekoTalk' } }
+    ]
+  },
     {
-      id: 'preset-s2v',
-      name: '文生数字人视频工作流',
+      id: 'preset-product-wearing',
+      name: '虚拟人结合电商产品工作流',
       updatedAt: Date.now(),
       isDirty: false,
       isRunning: false,
@@ -15,70 +84,116 @@ export const PRESET_WORKFLOWS: WorkflowState[] = [
       },
       globalInputs: {},
       history: [],
-      showIntermediateResults: false,
+      showIntermediateResults: true,
       connections: [
-        { id: 'c1', sourceNodeId: 'node-prompt', sourcePortId: 'out-text', targetNodeId: 'node-chat', targetPortId: 'in-text' },
-        { id: 'c2', sourceNodeId: 'node-chat', sourcePortId: 'image_prompt', targetNodeId: 'node-image', targetPortId: 'in-text' },
-        { id: 'c3', sourceNodeId: 'node-chat', sourcePortId: 'speech_text', targetNodeId: 'node-tts', targetPortId: 'in-text' },
-        { id: 'c4', sourceNodeId: 'node-chat', sourcePortId: 'tone', targetNodeId: 'node-tts', targetPortId: 'in-context-tone' },
-        { id: 'c5', sourceNodeId: 'node-image', sourcePortId: 'out-image', targetNodeId: 'node-avatar', targetPortId: 'in-image' },
-        { id: 'c6', sourceNodeId: 'node-tts', sourcePortId: 'out-audio', targetNodeId: 'node-avatar', targetPortId: 'in-audio' },
-        { id: 'c7', sourceNodeId: 'node-chat', sourcePortId: 'avatar_video_prompt', targetNodeId: 'node-avatar', targetPortId: 'in-text' }
+        // Input to AI Chat
+        { id: 'prod-c1', sourceNodeId: 'prod-node-person', sourcePortId: 'out-image', targetNodeId: 'prod-node-planner', targetPortId: 'in-image' },
+        { id: 'prod-c2', sourceNodeId: 'prod-node-product', sourcePortId: 'out-image', targetNodeId: 'prod-node-planner', targetPortId: 'in-image' },
+        { id: 'prod-c3', sourceNodeId: 'prod-node-text', sourcePortId: 'out-text', targetNodeId: 'prod-node-planner', targetPortId: 'in-text' },
+        // AI Chat to first image-to-image (front view) - both person and product images
+        { id: 'prod-c4', sourceNodeId: 'prod-node-planner', sourcePortId: 'front_prompt', targetNodeId: 'prod-node-i2i-front', targetPortId: 'in-text' },
+        { id: 'prod-c5', sourceNodeId: 'prod-node-person', sourcePortId: 'out-image', targetNodeId: 'prod-node-i2i-front', targetPortId: 'in-image' },
+        { id: 'prod-c5b', sourceNodeId: 'prod-node-product', sourcePortId: 'out-image', targetNodeId: 'prod-node-i2i-front', targetPortId: 'in-image' },
+        // All subsequent i2i nodes use the front image as base
+        { id: 'prod-c6', sourceNodeId: 'prod-node-i2i-front', sourcePortId: 'out-image', targetNodeId: 'prod-node-i2i-right45', targetPortId: 'in-image' },
+        { id: 'prod-c7', sourceNodeId: 'prod-node-planner', sourcePortId: 'right45_prompt', targetNodeId: 'prod-node-i2i-right45', targetPortId: 'in-text' },
+        { id: 'prod-c8', sourceNodeId: 'prod-node-i2i-front', sourcePortId: 'out-image', targetNodeId: 'prod-node-i2i-side90', targetPortId: 'in-image' },
+        { id: 'prod-c9', sourceNodeId: 'prod-node-planner', sourcePortId: 'side90_prompt', targetNodeId: 'prod-node-i2i-side90', targetPortId: 'in-text' },
+        { id: 'prod-c10', sourceNodeId: 'prod-node-i2i-front', sourcePortId: 'out-image', targetNodeId: 'prod-node-i2i-left45', targetPortId: 'in-image' },
+        { id: 'prod-c11', sourceNodeId: 'prod-node-planner', sourcePortId: 'left45_prompt', targetNodeId: 'prod-node-i2i-left45', targetPortId: 'in-text' },
+        { id: 'prod-c12', sourceNodeId: 'prod-node-i2i-front', sourcePortId: 'out-image', targetNodeId: 'prod-node-i2i-low', targetPortId: 'in-image' },
+        { id: 'prod-c13', sourceNodeId: 'prod-node-planner', sourcePortId: 'low_prompt', targetNodeId: 'prod-node-i2i-low', targetPortId: 'in-text' },
+        { id: 'prod-c14', sourceNodeId: 'prod-node-i2i-front', sourcePortId: 'out-image', targetNodeId: 'prod-node-i2i-high', targetPortId: 'in-image' },
+        { id: 'prod-c15', sourceNodeId: 'prod-node-planner', sourcePortId: 'high_prompt', targetNodeId: 'prod-node-i2i-high', targetPortId: 'in-text' },
+        // All images to video generation
+        { id: 'prod-c16', sourceNodeId: 'prod-node-i2i-front', sourcePortId: 'out-image', targetNodeId: 'prod-node-video-front', targetPortId: 'in-image' },
+        { id: 'prod-c17', sourceNodeId: 'prod-node-planner', sourcePortId: 'front_motion', targetNodeId: 'prod-node-video-front', targetPortId: 'in-text' },
+        { id: 'prod-c18', sourceNodeId: 'prod-node-i2i-right45', sourcePortId: 'out-image', targetNodeId: 'prod-node-video-right45', targetPortId: 'in-image' },
+        { id: 'prod-c19', sourceNodeId: 'prod-node-planner', sourcePortId: 'right45_motion', targetNodeId: 'prod-node-video-right45', targetPortId: 'in-text' },
+        { id: 'prod-c20', sourceNodeId: 'prod-node-i2i-side90', sourcePortId: 'out-image', targetNodeId: 'prod-node-video-side90', targetPortId: 'in-image' },
+        { id: 'prod-c21', sourceNodeId: 'prod-node-planner', sourcePortId: 'side90_motion', targetNodeId: 'prod-node-video-side90', targetPortId: 'in-text' },
+        { id: 'prod-c22', sourceNodeId: 'prod-node-i2i-left45', sourcePortId: 'out-image', targetNodeId: 'prod-node-video-left45', targetPortId: 'in-image' },
+        { id: 'prod-c23', sourceNodeId: 'prod-node-planner', sourcePortId: 'left45_motion', targetNodeId: 'prod-node-video-left45', targetPortId: 'in-text' },
+        { id: 'prod-c24', sourceNodeId: 'prod-node-i2i-low', sourcePortId: 'out-image', targetNodeId: 'prod-node-video-low', targetPortId: 'in-image' },
+        { id: 'prod-c25', sourceNodeId: 'prod-node-planner', sourcePortId: 'low_motion', targetNodeId: 'prod-node-video-low', targetPortId: 'in-text' },
+        { id: 'prod-c26', sourceNodeId: 'prod-node-i2i-high', sourcePortId: 'out-image', targetNodeId: 'prod-node-video-high', targetPortId: 'in-image' },
+        { id: 'prod-c27', sourceNodeId: 'prod-node-planner', sourcePortId: 'high_motion', targetNodeId: 'prod-node-video-high', targetPortId: 'in-text' }
       ],
       nodes: [
-        { id: 'node-prompt', toolId: 'text-prompt', x: 50, y: 200, status: NodeStatus.IDLE, data: { value: "一只哈士奇程序员狗，戴着耳机和工卡在办公，吐槽自己的程序员日常。用一些网络热梗。" } },
-        { id: 'node-chat', toolId: 'gemini-text', x: 450, y: 200, status: NodeStatus.IDLE, data: { 
-            model: 'deepseek-v3-2-251201',
+        // Input nodes
+        { id: 'prod-node-person', toolId: 'image-input', x: 50, y: 200, status: NodeStatus.IDLE, data: { value: ['/assets/model_girl.png'] } },
+        { id: 'prod-node-product', toolId: 'image-input', x: 50, y: 400, status: NodeStatus.IDLE, data: { value: ['/assets/product_glass.png'] } },
+        { id: 'prod-node-text', toolId: 'text-prompt', x: 50, y: 600, status: NodeStatus.IDLE, data: { value: "" } },
+        // AI Chat Planner (Doubao Vision)
+        { id: 'prod-node-planner', toolId: 'gemini-text', x: 450, y: 400, status: NodeStatus.IDLE, data: { 
+            model: 'doubao-seed-1-6-vision-250815',
             mode: 'custom',
-            customInstruction: `你是一位专业的数字人视频脚本编写者。你的任务是根据用户的输入描述，为数字人视频创建完整的脚本包。
-  
-  重要提示：
-  - 生成结果中的所有字段语言必须跟随用户输入的语言。如果用户使用中文输入，所有输出字段（speech_text、tone、image_prompt、avatar_video_prompt）都必须使用中文；如果用户使用英文输入，则所有输出字段都使用英文。
-  - 生成高质量、自然且引人入胜的数字人视频内容。
-  
-  对于 speech_text（语音文本）：
-  - 编写自然、对话式的脚本，听起来真实可信
-  - 保持简洁（正常语速下约20-40秒）
-  - 使用清晰、直接的语言，符合角色的个性和风格
-  - 确保脚本流畅自然，易于理解
-  - 重要：不要在语音文本中使用括号、方括号或任何标记来表示语气或情感
-  - 所有语气、情感和声音指令都应放在 'tone' 字段中，而不是 speech_text 中
-  - 编写纯对话文本，不包含任何舞台指示或语气标记
-  
-  对于 tone（语调指令）：
-  - 提供详细的配音指导，捕捉角色的个性
-  - 包含情感提示、节奏、重音点和声音特征
-  - 描述声音应该听起来如何（例如：温暖、权威、友好、严肃）
-  - 包含语气应该转换或强调某些词语/短语的具体时刻
-  - 使其对TTS系统具有可操作性，以产生自然的声音
-  
-  对于 image_prompt（肖像提示）：
-  - 创建与描述角色匹配的详细肖像描述
-  - 包含面部特征、年龄、表情、服装、背景、光线
-  - 确保描述适合肖像图像生成
-  - 匹配用户输入中角色的个性和风格
-  - 包含将使头像看起来专业且引人入胜的视觉细节
-  
-  对于 avatar_video_prompt（数字人视频动作提示）：
-  - 描述自然、真实的说话手势和动作
-  - 包含头部动作（点头、倾斜、轻微转动）
-  - 描述与语音内容和情感语调匹配的面部表情
-  - 如果合适，包含肢体语言和手势
-  - 指定眼神接触和视线方向
-  - 确保动作与语音节奏同步
-  - 足够详细，以指导数字人视频生成自然、逼真的效果
-  
-  以JSON格式输出所有四个字段。`,
+            customInstruction: `你是一位专业的虚拟人产品展示创意总监。你的任务是根据输入的人物图片、产品图片和可选的文字描述，生成详细的图生图修改提示词和视频运镜提示词。
+
+  重要原则：
+  - 生成结果中的所有字段语言必须跟随用户输入的语言。如果用户使用中文输入，所有输出字段（front_prompt、front_motion、right45_prompt等）都必须使用中文；如果用户使用英文输入，则所有输出字段都使用英文。
+  - 保持人物特征的一致性（面部特征、身材、服装等）
+  - 产品必须准确、自然地佩戴在人物身上
+  - 每个角度的图片都要保持产品佩戴位置和方式的准确性
+  - 确保所有角度的图片风格统一
+
+  你需要生成6个角度的图生图修改提示词和对应的视频运镜提示词：
+
+  1. 正面图（front_prompt）：让输入的人物图片中的人物佩戴输入的产品图片中的产品，保持人物和产品的一致性
+  2. 右边45度侧面（right45_prompt）：将正面图中的人物向右转45度，微微低头，保持人物和产品的一致性
+  3. 90度完全侧面（side90_prompt）：将正面图中的人物完全侧身，保持人物和产品的一致性
+  4. 左边45度侧面（left45_prompt）：将正面图中的人物向左转45度，保持人物和产品的一致性
+  5. 仰拍角度（low_prompt）：将正面图中的人物改为仰拍角度，从下往上拍摄，保持人物和产品的一致性
+  6. 俯拍角度（high_prompt）：将正面图中的人物改为俯拍角度，从上往下拍摄，保持人物和产品的一致性
+
+  每个图生图修改提示词应该：
+  - 强调"改"和"一致性"，不需要描述图片本身的内容
+  - 明确说明如何修改：例如"让图一的人物佩戴图二的眼镜，保持人物和物品一致性"
+  - 描述需要改变的姿势、角度、视角
+  - 强调保持人物特征和产品的一致性
+  - 不要描述光线、背景、氛围等图片细节
+
+  每个视频运镜提示词应该：
+  - 描述简单的相机运动，如"镜头从下移动至上，聚焦模特"
+  - 与对应角度的图片内容匹配
+  - 简洁明了，适合图生视频使用
+
+  输出格式：JSON，包含以下字段：
+  - front_prompt, front_motion
+  - right45_prompt, right45_motion
+  - side90_prompt, side90_motion
+  - left45_prompt, left45_motion
+  - low_prompt, low_motion
+  - high_prompt, high_motion`,
             customOutputs: [
-              { id: 'speech_text', label: '语音脚本', description: '人物对听众说的话。' },
-              { id: 'tone', label: '语调指令', description: '语音风格的提示。' },
-              { id: 'image_prompt', label: '肖像提示', description: '用于图像生成器的人物的肖像描述。' },
-              { id: 'avatar_video_prompt', label: '数字人视频动作提示', description: '数字人视频动作和运动的描述（例如：自然的说话手势、头部动作、面部表情）。' }
+              { id: 'front_prompt', label: '正面图提示词', description: '人物正面佩戴产品的详细图生图提示词' },
+              { id: 'front_motion', label: '正面运镜提示词', description: '正面图的视频运镜提示词' },
+              { id: 'right45_prompt', label: '右边45度提示词', description: '右边45度侧面，人物微微低头的图生图提示词' },
+              { id: 'right45_motion', label: '右边45度运镜提示词', description: '右边45度图的视频运镜提示词' },
+              { id: 'side90_prompt', label: '90度侧面提示词', description: '完全侧面的图生图提示词' },
+              { id: 'side90_motion', label: '90度侧面运镜提示词', description: '90度侧面图的视频运镜提示词' },
+              { id: 'left45_prompt', label: '左边45度提示词', description: '左边45度侧面的图生图提示词' },
+              { id: 'left45_motion', label: '左边45度运镜提示词', description: '左边45度图的视频运镜提示词' },
+              { id: 'low_prompt', label: '仰拍提示词', description: '仰拍角度的图生图提示词' },
+              { id: 'low_motion', label: '仰拍运镜提示词', description: '仰拍图的视频运镜提示词' },
+              { id: 'high_prompt', label: '俯拍提示词', description: '俯拍角度的图生图提示词' },
+              { id: 'high_motion', label: '俯拍运镜提示词', description: '俯拍图的视频运镜提示词' }
             ]
         } },
-        { id: 'node-image', toolId: 'text-to-image', x: 900, y: 50, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-2512', aspectRatio: "9:16" } },
-        { id: 'node-tts', toolId: 'tts', x: 900, y: 350, status: NodeStatus.IDLE, data: { model: 'lightx2v', voiceType: 'zh_male_dayi_saturn_bigtts', resourceId: 'seed-tts-2.0' } },
-        { id: 'node-avatar', toolId: 'avatar-gen', x: 1500, y: 200, status: NodeStatus.IDLE, data: {} }
+        // Image-to-image nodes (6 angles)
+        { id: 'prod-node-i2i-front', toolId: 'image-to-image', x: 900, y: 50, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+        { id: 'prod-node-i2i-right45', toolId: 'image-to-image', x: 900, y: 150, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+        { id: 'prod-node-i2i-side90', toolId: 'image-to-image', x: 900, y: 250, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+        { id: 'prod-node-i2i-left45', toolId: 'image-to-image', x: 900, y: 350, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+        { id: 'prod-node-i2i-low', toolId: 'image-to-image', x: 900, y: 450, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+        { id: 'prod-node-i2i-high', toolId: 'image-to-image', x: 900, y: 550, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+        // Video generation nodes (6 videos)
+        { id: 'prod-node-video-front', toolId: 'video-gen-image', x: 1500, y: 50, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+        { id: 'prod-node-video-right45', toolId: 'video-gen-image', x: 1500, y: 150, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+        { id: 'prod-node-video-side90', toolId: 'video-gen-image', x: 1500, y: 250, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+        { id: 'prod-node-video-left45', toolId: 'video-gen-image', x: 1500, y: 350, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+        { id: 'prod-node-video-low', toolId: 'video-gen-image', x: 1500, y: 450, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+        { id: 'prod-node-video-high', toolId: 'video-gen-image', x: 1500, y: 550, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } }
       ]
     },
     {
@@ -107,7 +222,7 @@ export const PRESET_WORKFLOWS: WorkflowState[] = [
         { id: 'node-img-in', toolId: 'image-input', x: 50, y: 50, status: NodeStatus.IDLE, data: { value: ['/assets/girl.jpg'] } },
         { id: 'node-text-in', toolId: 'text-prompt', x: 50, y: 350, status: NodeStatus.IDLE, data: { value: "女孩改为穿着性感纯欲的睡衣坐在床上，用性感迷人的声音说着勾人的话" } },
         { id: 'node-logic', toolId: 'gemini-text', x: 450, y: 350, status: NodeStatus.IDLE, data: { 
-            model: 'doubao-1-5-vision-pro-32k-250115',
+            model: 'doubao-seed-1-6-vision-250815',
             mode: 'custom',
             customInstruction: `你是一位专业的数字人视频创意总监。你的任务是根据输入的人物图片和文字描述，生成同步的数字人视频组件。
 
@@ -211,7 +326,7 @@ export const PRESET_WORKFLOWS: WorkflowState[] = [
         { id: 'node-desc', toolId: 'text-prompt', x: 50, y: 200, status: NodeStatus.IDLE, data: { value: "冰雪奇缘中的艾莎公主早晨醒来，在温馨的房间里梳妆打扮，然后望向窗外，窗外是很漂亮的阿伦黛尔小镇风光，然后镜头转向远景能够看到艾莎公主在窗边伸了个懒腰" } },
         // Planner node
         { id: 'node-planner', toolId: 'gemini-text', x: 450, y: 350, status: NodeStatus.IDLE, data: { 
-            model: 'doubao-1-5-vision-pro-32k-250115',
+            model: 'doubao-seed-1-6-vision-250815',
             mode: 'custom',
             customInstruction: `你是一位专业的视频故事板规划师。你的任务是根据输入描述和人物图片，将其分解为恰好9个场景（分镜）用于顺序图像生成。
   
@@ -389,7 +504,7 @@ export const PRESET_WORKFLOWS: WorkflowState[] = [
         { id: 'node-text-in', toolId: 'text-prompt', x: 50, y: 200, status: NodeStatus.IDLE, data: { value: "冰雪奇缘中的艾莎公主正在演唱《Let It Go》，动作优雅，表情充满自信和力量" } },
         // AI Chat Planner (Doubao Vision)
         { id: 'node-planner', toolId: 'gemini-text', x: 450, y: 400, status: NodeStatus.IDLE, data: { 
-            model: 'doubao-1-5-vision-pro-32k-250115',
+            model: 'doubao-seed-1-6-vision-250815',
             mode: 'custom',
             customInstruction: `你是一位专业的音乐视频多机位导演。你的任务是根据输入的角色图片和可选的文字描述，为演唱表演生成9个不同机位的详细描述。
   
@@ -478,6 +593,83 @@ export const PRESET_WORKFLOWS: WorkflowState[] = [
         { id: 'node-video-4', toolId: 'video-gen-image', x: 1500, y: 350, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
         { id: 'node-video-7', toolId: 'video-gen-image', x: 1500, y: 650, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
         { id: 'node-video-8', toolId: 'video-gen-image', x: 1500, y: 750, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } }
+      ]
+    },
+    {
+      id: 'preset-chibi-avatar',
+      name: 'Q版数字人',
+      updatedAt: Date.now(),
+      isDirty: false,
+      isRunning: false,
+      env: {
+        lightx2v_url: "",
+        lightx2v_token: ""
+      },
+      globalInputs: {},
+      history: [],
+      showIntermediateResults: true,
+      connections: [
+        { id: 'c1', sourceNodeId: 'chibi-node-person', sourcePortId: 'out-image', targetNodeId: 'chibi-node-ai', targetPortId: 'in-image' },
+        { id: 'c2', sourceNodeId: 'chibi-node-input', sourcePortId: 'out-text', targetNodeId: 'chibi-node-ai', targetPortId: 'in-text' },
+        { id: 'c3', sourceNodeId: 'chibi-node-ai', sourcePortId: 'i2i_prompt', targetNodeId: 'chibi-node-i2i', targetPortId: 'in-text' },
+        { id: 'c4', sourceNodeId: 'chibi-node-person', sourcePortId: 'out-image', targetNodeId: 'chibi-node-i2i', targetPortId: 'in-image' },
+        { id: 'c5', sourceNodeId: 'chibi-node-ai', sourcePortId: 'tts_text', targetNodeId: 'chibi-node-tts', targetPortId: 'in-text' },
+        { id: 'c6', sourceNodeId: 'chibi-node-ai', sourcePortId: 'voice_style', targetNodeId: 'chibi-node-tts', targetPortId: 'in-context-tone' },
+        { id: 'c7', sourceNodeId: 'chibi-node-i2i', sourcePortId: 'out-image', targetNodeId: 'chibi-node-avatar', targetPortId: 'in-image' },
+        { id: 'c8', sourceNodeId: 'chibi-node-tts', sourcePortId: 'out-audio', targetNodeId: 'chibi-node-avatar', targetPortId: 'in-audio' },
+        { id: 'c9', sourceNodeId: 'chibi-node-ai', sourcePortId: 's2v_prompt', targetNodeId: 'chibi-node-avatar', targetPortId: 'in-text' }
+      ],
+      nodes: [
+        { id: 'chibi-node-person', toolId: 'image-input', x: 50, y: 200, status: NodeStatus.IDLE, data: { value: [] } },
+        { id: 'chibi-node-doll-ref', toolId: 'image-input', x: 50, y: 50, status: NodeStatus.IDLE, data: { value: ['/assets/doll.jpg'] } },
+        { id: 'chibi-node-input', toolId: 'text-prompt', x: 50, y: 400, status: NodeStatus.IDLE, data: { value: "角色说的话和角色背景描述" } },
+        { id: 'chibi-node-ai', toolId: 'gemini-text', x: 450, y: 300, status: NodeStatus.IDLE, data: { 
+            model: 'doubao-seed-1-6-vision-250815',
+            mode: 'custom',
+            customInstruction: `你是一位专业的Q版数字人视频创意总监。你的任务是根据输入的人物图片和用户描述（角色说的话和角色背景），生成完整的Q版数字人视频组件。
+
+重要原则：
+- 生成结果中的所有字段语言必须跟随用户输入的语言。如果用户使用中文输入，所有输出字段（i2i_prompt、tts_text、voice_style、s2v_prompt）都必须使用中文；如果用户使用英文输入，则所有输出字段都使用英文。
+
+参考风格：Q版球关节娃娃风格，将照片中的人物转换为Q版球关节娃娃，保持人物的面部特征一致但风格化，大脑袋小身体比例，光滑的树脂质感皮肤，闪亮的娃娃眼睛，简化的面部结构，柔和的腮红，可见的关节段，可爱的艺术玩具美学，角色自然站立，双脚着地，干净的纯白背景，柔和均匀的光线，高细节，无阴影杂乱。
+
+对于 i2i_prompt（图生图修改提示词）：
+- 基于输入的人物图片，将其转换为Q版球关节娃娃风格
+- 强调"改"和"一致性"，不需要描述图片本身的内容
+- 明确说明如何修改：将输入图片中的人物转换为Q版球关节娃娃风格，保持人物面部特征的一致性（面部特征、表情等），但风格化为大脑袋小身体比例，光滑的树脂质感皮肤，闪亮的娃娃眼睛，简化的面部结构，柔和的腮红，可见的关节段，可爱的艺术玩具美学
+- 角色自然站立，双脚着地，干净的纯白背景，柔和均匀的光线，高细节，无阴影杂乱
+- 确保修改后的描述与角色背景相匹配
+
+对于 tts_text（语音脚本）：
+- 根据用户的输入描述生成相应的口语脚本
+- 脚本内容应与用户的描述和角色背景相匹配
+- 使用自然、对话式的语言
+- 长度应适合数字人视频使用（正常语速下约20-40秒）
+
+对于 voice_style（语调指令）：
+- 根据用户的输入描述和角色背景特点，提供相应的配音指导
+- 描述配音应该体现的风格、情感、语气等特点
+- 确保语调指令与脚本内容和角色背景相匹配
+- Q版角色通常需要可爱、活泼、轻快的语调
+
+对于 s2v_prompt（数字人视频动作提示）：
+- 描述自然、真实的说话手势和动作
+- 包含头部动作（点头、倾斜、轻微转动）
+- 描述与语音内容和情感语调匹配的面部表情
+- Q版角色可以有一些可爱的动作，如轻微摆动、活泼的手势
+- 指定眼神接触和视线方向
+- 确保动作与语音节奏同步
+- 足够详细，以指导数字人视频生成自然、逼真的效果`,
+            customOutputs: [
+              { id: 'i2i_prompt', label: '改图提示词', description: '将人物转换为Q版球关节娃娃风格的图生图修改提示词。' },
+              { id: 'tts_text', label: 'TTS文案', description: '根据用户描述生成的语音脚本。' },
+              { id: 'voice_style', label: 'TTS语气指令', description: '根据用户描述和角色背景生成的配音指导。' },
+              { id: 's2v_prompt', label: 'S2V提示词', description: '数字人视频动作和运动的描述。' }
+            ]
+        } },
+        { id: 'chibi-node-i2i', toolId: 'image-to-image', x: 900, y: 50, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+        { id: 'chibi-node-tts', toolId: 'tts', x: 900, y: 450, status: NodeStatus.IDLE, data: { model: 'lightx2v', voiceType: 'zh_female_vv_uranus_bigtts', resourceId: 'seed-tts-2.0' } },
+        { id: 'chibi-node-avatar', toolId: 'avatar-gen', x: 1500, y: 250, status: NodeStatus.IDLE, data: { model: 'SekoTalk' } }
       ]
     },
     {
@@ -613,130 +805,6 @@ export const PRESET_WORKFLOWS: WorkflowState[] = [
       ]
     },
     {
-      id: 'preset-product-wearing',
-      name: '虚拟人结合电商产品工作流',
-      updatedAt: Date.now(),
-      isDirty: false,
-      isRunning: false,
-      env: {
-        lightx2v_url: "",
-        lightx2v_token: ""
-      },
-      globalInputs: {},
-      history: [],
-      showIntermediateResults: true,
-      connections: [
-        // Input to AI Chat
-        { id: 'prod-c1', sourceNodeId: 'prod-node-person', sourcePortId: 'out-image', targetNodeId: 'prod-node-planner', targetPortId: 'in-image' },
-        { id: 'prod-c2', sourceNodeId: 'prod-node-product', sourcePortId: 'out-image', targetNodeId: 'prod-node-planner', targetPortId: 'in-image' },
-        { id: 'prod-c3', sourceNodeId: 'prod-node-text', sourcePortId: 'out-text', targetNodeId: 'prod-node-planner', targetPortId: 'in-text' },
-        // AI Chat to first image-to-image (front view) - both person and product images
-        { id: 'prod-c4', sourceNodeId: 'prod-node-planner', sourcePortId: 'front_prompt', targetNodeId: 'prod-node-i2i-front', targetPortId: 'in-text' },
-        { id: 'prod-c5', sourceNodeId: 'prod-node-person', sourcePortId: 'out-image', targetNodeId: 'prod-node-i2i-front', targetPortId: 'in-image' },
-        { id: 'prod-c5b', sourceNodeId: 'prod-node-product', sourcePortId: 'out-image', targetNodeId: 'prod-node-i2i-front', targetPortId: 'in-image' },
-        // All subsequent i2i nodes use the front image as base
-        { id: 'prod-c6', sourceNodeId: 'prod-node-i2i-front', sourcePortId: 'out-image', targetNodeId: 'prod-node-i2i-right45', targetPortId: 'in-image' },
-        { id: 'prod-c7', sourceNodeId: 'prod-node-planner', sourcePortId: 'right45_prompt', targetNodeId: 'prod-node-i2i-right45', targetPortId: 'in-text' },
-        { id: 'prod-c8', sourceNodeId: 'prod-node-i2i-front', sourcePortId: 'out-image', targetNodeId: 'prod-node-i2i-side90', targetPortId: 'in-image' },
-        { id: 'prod-c9', sourceNodeId: 'prod-node-planner', sourcePortId: 'side90_prompt', targetNodeId: 'prod-node-i2i-side90', targetPortId: 'in-text' },
-        { id: 'prod-c10', sourceNodeId: 'prod-node-i2i-front', sourcePortId: 'out-image', targetNodeId: 'prod-node-i2i-left45', targetPortId: 'in-image' },
-        { id: 'prod-c11', sourceNodeId: 'prod-node-planner', sourcePortId: 'left45_prompt', targetNodeId: 'prod-node-i2i-left45', targetPortId: 'in-text' },
-        { id: 'prod-c12', sourceNodeId: 'prod-node-i2i-front', sourcePortId: 'out-image', targetNodeId: 'prod-node-i2i-low', targetPortId: 'in-image' },
-        { id: 'prod-c13', sourceNodeId: 'prod-node-planner', sourcePortId: 'low_prompt', targetNodeId: 'prod-node-i2i-low', targetPortId: 'in-text' },
-        { id: 'prod-c14', sourceNodeId: 'prod-node-i2i-front', sourcePortId: 'out-image', targetNodeId: 'prod-node-i2i-high', targetPortId: 'in-image' },
-        { id: 'prod-c15', sourceNodeId: 'prod-node-planner', sourcePortId: 'high_prompt', targetNodeId: 'prod-node-i2i-high', targetPortId: 'in-text' },
-        // All images to video generation
-        { id: 'prod-c16', sourceNodeId: 'prod-node-i2i-front', sourcePortId: 'out-image', targetNodeId: 'prod-node-video-front', targetPortId: 'in-image' },
-        { id: 'prod-c17', sourceNodeId: 'prod-node-planner', sourcePortId: 'front_motion', targetNodeId: 'prod-node-video-front', targetPortId: 'in-text' },
-        { id: 'prod-c18', sourceNodeId: 'prod-node-i2i-right45', sourcePortId: 'out-image', targetNodeId: 'prod-node-video-right45', targetPortId: 'in-image' },
-        { id: 'prod-c19', sourceNodeId: 'prod-node-planner', sourcePortId: 'right45_motion', targetNodeId: 'prod-node-video-right45', targetPortId: 'in-text' },
-        { id: 'prod-c20', sourceNodeId: 'prod-node-i2i-side90', sourcePortId: 'out-image', targetNodeId: 'prod-node-video-side90', targetPortId: 'in-image' },
-        { id: 'prod-c21', sourceNodeId: 'prod-node-planner', sourcePortId: 'side90_motion', targetNodeId: 'prod-node-video-side90', targetPortId: 'in-text' },
-        { id: 'prod-c22', sourceNodeId: 'prod-node-i2i-left45', sourcePortId: 'out-image', targetNodeId: 'prod-node-video-left45', targetPortId: 'in-image' },
-        { id: 'prod-c23', sourceNodeId: 'prod-node-planner', sourcePortId: 'left45_motion', targetNodeId: 'prod-node-video-left45', targetPortId: 'in-text' },
-        { id: 'prod-c24', sourceNodeId: 'prod-node-i2i-low', sourcePortId: 'out-image', targetNodeId: 'prod-node-video-low', targetPortId: 'in-image' },
-        { id: 'prod-c25', sourceNodeId: 'prod-node-planner', sourcePortId: 'low_motion', targetNodeId: 'prod-node-video-low', targetPortId: 'in-text' },
-        { id: 'prod-c26', sourceNodeId: 'prod-node-i2i-high', sourcePortId: 'out-image', targetNodeId: 'prod-node-video-high', targetPortId: 'in-image' },
-        { id: 'prod-c27', sourceNodeId: 'prod-node-planner', sourcePortId: 'high_motion', targetNodeId: 'prod-node-video-high', targetPortId: 'in-text' }
-      ],
-      nodes: [
-        // Input nodes
-        { id: 'prod-node-person', toolId: 'image-input', x: 50, y: 200, status: NodeStatus.IDLE, data: { value: ['/assets/model_girl.png'] } },
-        { id: 'prod-node-product', toolId: 'image-input', x: 50, y: 400, status: NodeStatus.IDLE, data: { value: ['/assets/product_glass.png'] } },
-        { id: 'prod-node-text', toolId: 'text-prompt', x: 50, y: 600, status: NodeStatus.IDLE, data: { value: "" } },
-        // AI Chat Planner (Doubao Vision)
-        { id: 'prod-node-planner', toolId: 'gemini-text', x: 450, y: 400, status: NodeStatus.IDLE, data: { 
-            model: 'doubao-1-5-vision-pro-32k-250115',
-            mode: 'custom',
-            customInstruction: `你是一位专业的虚拟人产品展示创意总监。你的任务是根据输入的人物图片、产品图片和可选的文字描述，生成详细的图生图修改提示词和视频运镜提示词。
-
-重要原则：
-- 生成结果中的所有字段语言必须跟随用户输入的语言。如果用户使用中文输入，所有输出字段（front_prompt、front_motion、right45_prompt等）都必须使用中文；如果用户使用英文输入，则所有输出字段都使用英文。
-- 保持人物特征的一致性（面部特征、身材、服装等）
-- 产品必须准确、自然地佩戴在人物身上
-- 每个角度的图片都要保持产品佩戴位置和方式的准确性
-- 确保所有角度的图片风格统一
-
-你需要生成6个角度的图生图修改提示词和对应的视频运镜提示词：
-
-1. 正面图（front_prompt）：让输入的人物图片中的人物佩戴输入的产品图片中的产品，保持人物和产品的一致性
-2. 右边45度侧面（right45_prompt）：将正面图中的人物向右转45度，微微低头，保持人物和产品的一致性
-3. 90度完全侧面（side90_prompt）：将正面图中的人物完全侧身，保持人物和产品的一致性
-4. 左边45度侧面（left45_prompt）：将正面图中的人物向左转45度，保持人物和产品的一致性
-5. 仰拍角度（low_prompt）：将正面图中的人物改为仰拍角度，从下往上拍摄，保持人物和产品的一致性
-6. 俯拍角度（high_prompt）：将正面图中的人物改为俯拍角度，从上往下拍摄，保持人物和产品的一致性
-
-每个图生图修改提示词应该：
-- 强调"改"和"一致性"，不需要描述图片本身的内容
-- 明确说明如何修改：例如"让图一的人物佩戴图二的眼镜，保持人物和物品一致性"
-- 描述需要改变的姿势、角度、视角
-- 强调保持人物特征和产品的一致性
-- 不要描述光线、背景、氛围等图片细节
-
-每个视频运镜提示词应该：
-- 描述简单的相机运动，如"镜头从下移动至上，聚焦模特"
-- 与对应角度的图片内容匹配
-- 简洁明了，适合图生视频使用
-
-输出格式：JSON，包含以下字段：
-- front_prompt, front_motion
-- right45_prompt, right45_motion
-- side90_prompt, side90_motion
-- left45_prompt, left45_motion
-- low_prompt, low_motion
-- high_prompt, high_motion`,
-            customOutputs: [
-              { id: 'front_prompt', label: '正面图提示词', description: '人物正面佩戴产品的详细图生图提示词' },
-              { id: 'front_motion', label: '正面运镜提示词', description: '正面图的视频运镜提示词' },
-              { id: 'right45_prompt', label: '右边45度提示词', description: '右边45度侧面，人物微微低头的图生图提示词' },
-              { id: 'right45_motion', label: '右边45度运镜提示词', description: '右边45度图的视频运镜提示词' },
-              { id: 'side90_prompt', label: '90度侧面提示词', description: '完全侧面的图生图提示词' },
-              { id: 'side90_motion', label: '90度侧面运镜提示词', description: '90度侧面图的视频运镜提示词' },
-              { id: 'left45_prompt', label: '左边45度提示词', description: '左边45度侧面的图生图提示词' },
-              { id: 'left45_motion', label: '左边45度运镜提示词', description: '左边45度图的视频运镜提示词' },
-              { id: 'low_prompt', label: '仰拍提示词', description: '仰拍角度的图生图提示词' },
-              { id: 'low_motion', label: '仰拍运镜提示词', description: '仰拍图的视频运镜提示词' },
-              { id: 'high_prompt', label: '俯拍提示词', description: '俯拍角度的图生图提示词' },
-              { id: 'high_motion', label: '俯拍运镜提示词', description: '俯拍图的视频运镜提示词' }
-            ]
-        } },
-        // Image-to-image nodes (6 angles)
-        { id: 'prod-node-i2i-front', toolId: 'image-to-image', x: 900, y: 50, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-        { id: 'prod-node-i2i-right45', toolId: 'image-to-image', x: 900, y: 150, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-        { id: 'prod-node-i2i-side90', toolId: 'image-to-image', x: 900, y: 250, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-        { id: 'prod-node-i2i-left45', toolId: 'image-to-image', x: 900, y: 350, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-        { id: 'prod-node-i2i-low', toolId: 'image-to-image', x: 900, y: 450, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-        { id: 'prod-node-i2i-high', toolId: 'image-to-image', x: 900, y: 550, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
-        // Video generation nodes (6 videos)
-        { id: 'prod-node-video-front', toolId: 'video-gen-image', x: 1500, y: 50, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-        { id: 'prod-node-video-right45', toolId: 'video-gen-image', x: 1500, y: 150, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-        { id: 'prod-node-video-side90', toolId: 'video-gen-image', x: 1500, y: 250, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-        { id: 'prod-node-video-left45', toolId: 'video-gen-image', x: 1500, y: 350, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-        { id: 'prod-node-video-low', toolId: 'video-gen-image', x: 1500, y: 450, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
-        { id: 'prod-node-video-high', toolId: 'video-gen-image', x: 1500, y: 550, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } }
-      ]
-    },
-    {
         id: 'preset-morph',
         name: '文生首尾帧视频工作流',
         updatedAt: Date.now(),
@@ -781,5 +849,83 @@ export const PRESET_WORKFLOWS: WorkflowState[] = [
           { id: 'node-end-frame', toolId: 'image-to-image', x: 900, y: 550, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511' } },
           { id: 'node-video', toolId: 'video-gen-dual-frame', x: 1500, y: 300, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: "16:9" } }
         ]
-      }
-  ];
+      },
+      {
+        id: 'preset-s2v',
+        name: '文生数字人视频工作流',
+        updatedAt: Date.now(),
+        isDirty: false,
+        isRunning: false,
+        env: {
+          lightx2v_url: "",
+          lightx2v_token: ""
+        },
+        globalInputs: {},
+        history: [],
+        showIntermediateResults: false,
+        connections: [
+          { id: 'c1', sourceNodeId: 'node-prompt', sourcePortId: 'out-text', targetNodeId: 'node-chat', targetPortId: 'in-text' },
+          { id: 'c2', sourceNodeId: 'node-chat', sourcePortId: 'image_prompt', targetNodeId: 'node-image', targetPortId: 'in-text' },
+          { id: 'c3', sourceNodeId: 'node-chat', sourcePortId: 'speech_text', targetNodeId: 'node-tts', targetPortId: 'in-text' },
+          { id: 'c4', sourceNodeId: 'node-chat', sourcePortId: 'tone', targetNodeId: 'node-tts', targetPortId: 'in-context-tone' },
+          { id: 'c5', sourceNodeId: 'node-image', sourcePortId: 'out-image', targetNodeId: 'node-avatar', targetPortId: 'in-image' },
+          { id: 'c6', sourceNodeId: 'node-tts', sourcePortId: 'out-audio', targetNodeId: 'node-avatar', targetPortId: 'in-audio' },
+          { id: 'c7', sourceNodeId: 'node-chat', sourcePortId: 'avatar_video_prompt', targetNodeId: 'node-avatar', targetPortId: 'in-text' }
+        ],
+        nodes: [
+          { id: 'node-prompt', toolId: 'text-prompt', x: 50, y: 200, status: NodeStatus.IDLE, data: { value: "一只哈士奇程序员狗，戴着耳机和工卡在办公，吐槽自己的程序员日常。用一些网络热梗。" } },
+          { id: 'node-chat', toolId: 'gemini-text', x: 450, y: 200, status: NodeStatus.IDLE, data: { 
+              model: 'deepseek-v3-2-251201',
+              mode: 'custom',
+              customInstruction: `你是一位专业的数字人视频脚本编写者。你的任务是根据用户的输入描述，为数字人视频创建完整的脚本包。
+    
+    重要提示：
+    - 生成结果中的所有字段语言必须跟随用户输入的语言。如果用户使用中文输入，所有输出字段（speech_text、tone、image_prompt、avatar_video_prompt）都必须使用中文；如果用户使用英文输入，则所有输出字段都使用英文。
+    - 生成高质量、自然且引人入胜的数字人视频内容。
+    
+    对于 speech_text（语音文本）：
+    - 编写自然、对话式的脚本，听起来真实可信
+    - 保持简洁（正常语速下约20-40秒）
+    - 使用清晰、直接的语言，符合角色的个性和风格
+    - 确保脚本流畅自然，易于理解
+    - 重要：不要在语音文本中使用括号、方括号或任何标记来表示语气或情感
+    - 所有语气、情感和声音指令都应放在 'tone' 字段中，而不是 speech_text 中
+    - 编写纯对话文本，不包含任何舞台指示或语气标记
+    
+    对于 tone（语调指令）：
+    - 提供详细的配音指导，捕捉角色的个性
+    - 包含情感提示、节奏、重音点和声音特征
+    - 描述声音应该听起来如何（例如：温暖、权威、友好、严肃）
+    - 包含语气应该转换或强调某些词语/短语的具体时刻
+    - 使其对TTS系统具有可操作性，以产生自然的声音
+    
+    对于 image_prompt（肖像提示）：
+    - 创建与描述角色匹配的详细肖像描述
+    - 包含面部特征、年龄、表情、服装、背景、光线
+    - 确保描述适合肖像图像生成
+    - 匹配用户输入中角色的个性和风格
+    - 包含将使头像看起来专业且引人入胜的视觉细节
+    
+    对于 avatar_video_prompt（数字人视频动作提示）：
+    - 描述自然、真实的说话手势和动作
+    - 包含头部动作（点头、倾斜、轻微转动）
+    - 描述与语音内容和情感语调匹配的面部表情
+    - 如果合适，包含肢体语言和手势
+    - 指定眼神接触和视线方向
+    - 确保动作与语音节奏同步
+    - 足够详细，以指导数字人视频生成自然、逼真的效果
+    
+    以JSON格式输出所有四个字段。`,
+              customOutputs: [
+                { id: 'speech_text', label: '语音脚本', description: '人物对听众说的话。' },
+                { id: 'tone', label: '语调指令', description: '语音风格的提示。' },
+                { id: 'image_prompt', label: '肖像提示', description: '用于图像生成器的人物的肖像描述。' },
+                { id: 'avatar_video_prompt', label: '数字人视频动作提示', description: '数字人视频动作和运动的描述（例如：自然的说话手势、头部动作、面部表情）。' }
+              ]
+          } },
+          { id: 'node-image', toolId: 'text-to-image', x: 900, y: 50, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-2512', aspectRatio: "9:16" } },
+          { id: 'node-tts', toolId: 'tts', x: 900, y: 350, status: NodeStatus.IDLE, data: { model: 'lightx2v', voiceType: 'zh_male_dayi_saturn_bigtts', resourceId: 'seed-tts-2.0' } },
+          { id: 'node-avatar', toolId: 'avatar-gen', x: 1500, y: 200, status: NodeStatus.IDLE, data: {} }
+        ]
+      },
+];

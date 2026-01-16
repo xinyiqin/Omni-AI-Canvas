@@ -921,14 +921,15 @@ export const lightX2VGetCloneVoiceList = async (
 
 /**
  * DeepSeek Chat API Integration
- * Uses the DeepSeek API endpoint for chat completions
+ * Uses the DeepSeek API endpoint for responses (new API format)
  */
 export const deepseekText = async (
   prompt: string,
   mode = 'basic',
   customInstruction?: string,
   model = 'deepseek-v3-2-251201',
-  outputFields?: OutputField[]
+  outputFields?: OutputField[],
+  useSearch = false
 ): Promise<any> => {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
@@ -955,39 +956,57 @@ export const deepseekText = async (
   const hasMultipleOutputs = outputFields && outputFields.length > 0;
   const outputKeys = outputFields?.map(f => f.id) || [];
 
-  // Build messages array with system instruction and user prompt
-  const messages: Array<{ role: string; content: string }> = [];
+  // Build input array with user content
+  const inputContent: any[] = [];
   
-  // Add system message if needed
-  if (baseInstruction && mode !== 'basic') {
-    messages.push({
-      role: 'system',
-      content: baseInstruction
-    });
-  }
-  
-  // Add user message with instruction for multiple outputs if needed
-  const userContent = hasMultipleOutputs
+  // Add text content
+  const textContent = hasMultipleOutputs
     ? `${promptStr}\n\nIMPORTANT: You MUST generate content for each field as JSON: ${outputKeys.join(', ')}.`
     : promptStr;
   
-  messages.push({
-    role: 'user',
-    content: userContent
+  inputContent.push({
+    type: 'input_text',
+    text: textContent
   });
 
+  // Build request body for new responses API
   const requestBody: any = {
     model: model,
-    messages: messages,
-    temperature: 0.7,
+    stream: false,
+    input: [
+      {
+        role: 'user',
+        content: inputContent
+      }
+    ]
   };
 
-  // Add JSON mode for structured output if multiple outputs are required
-  if (hasMultipleOutputs) {
-    requestBody.response_format = { type: 'json_object' };
+  // Add system instruction if needed
+  if (baseInstruction && mode !== 'basic') {
+    requestBody.input.unshift({
+      role: 'system',
+      content: [
+        {
+          type: 'input_text',
+          text: baseInstruction
+        }
+      ]
+    });
   }
 
-  const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/chat/completions', {
+  // Add web search tool if useSearch is enabled
+  if (useSearch) {
+    requestBody.tools = [
+      { type: "web_search" }
+    ];
+  }
+
+  // Add JSON mode for structured output if multiple outputs are required
+  // if (hasMultipleOutputs) {
+  //   requestBody.response_format = { type: 'json_object' };
+  // }
+
+  const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/responses', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -1009,7 +1028,72 @@ export const deepseekText = async (
   }
 
   const data = await response.json();
-  const text = data.choices?.[0]?.message?.content || "";
+  // Debug: log the full response structure for troubleshooting
+  if (useSearch) {
+    console.log('[DeepSeek] Full API response:', JSON.stringify(data, null, 2));
+  }
+  
+  // New API format: response.output is an array, find the message type item
+  // The message item has content array with type: "output_text"
+  let text = "";
+  if (data.output && Array.isArray(data.output)) {
+    // Find all message type outputs (usually the last one contains the final answer)
+    const messageOutputs = data.output.filter((item: any) => item.type === "message");
+    // Use the last message output (final answer)
+    const messageOutput = messageOutputs.length > 0 ? messageOutputs[messageOutputs.length - 1] : null;
+    
+    if (messageOutput && messageOutput.content && Array.isArray(messageOutput.content)) {
+      // Find all output_text items and concatenate them
+      const textContents = messageOutput.content.filter((item: any) => item.type === "output_text");
+      if (textContents.length > 0) {
+        // Concatenate all text contents
+        text = textContents.map((item: any) => item.text || "").join("");
+        if (useSearch) {
+          console.log('[DeepSeek] Extracted text length:', text.length, 'characters');
+        }
+      }
+    }
+    
+    // Debug log if text is empty
+    if (!text) {
+      console.warn('[DeepSeek] Failed to extract text from response:', JSON.stringify(data, null, 2));
+    }
+  }
+  // Fallback to old format for backward compatibility
+  if (!text) {
+    text = data.output?.[0]?.content?.[0]?.text || data.choices?.[0]?.message?.content || "";
+  }
+
+  // Post-process: extract JSON from code blocks if present
+  // The response API may return JSON wrapped in ```json ... ``` code blocks
+  if (text.includes('```json')) {
+    const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
+    if (jsonMatch && jsonMatch[1]) {
+      try {
+        const extractedJson = JSON.parse(jsonMatch[1].trim());
+        // If hasMultipleOutputs is true, return the JSON object (already in correct format)
+        if (hasMultipleOutputs) {
+          outputKeys.forEach(key => { if (!(key in extractedJson)) extractedJson[key] = "..."; });
+          return extractedJson;
+        }
+        // If hasMultipleOutputs is false but JSON contains output fields, extract the first value
+        // This handles cases where API returns { "out-text": "..." } but we want just the text
+        const jsonKeys = Object.keys(extractedJson);
+        if (jsonKeys.length === 1 && jsonKeys[0].startsWith('out-')) {
+          return extractedJson[jsonKeys[0]];
+        }
+        // If it matches expected output keys, extract the value
+        if (outputKeys.length === 1 && outputKeys[0] in extractedJson) {
+          return extractedJson[outputKeys[0]];
+        }
+        // Otherwise return the parsed JSON
+        return extractedJson;
+      } catch (e) {
+        console.warn('[DeepSeek] Failed to parse JSON from code block:', e);
+        // Fall through to normal processing
+      }
+    }
+  }
 
   if (hasMultipleOutputs) {
     try {
@@ -1028,15 +1112,16 @@ export const deepseekText = async (
 
 /**
  * Doubao Vision Chat API Integration
- * Uses the Doubao API endpoint for chat completions with vision support
+ * Uses the Doubao API endpoint for responses (new API format) with vision support
  */
 export const doubaoText = async (
   prompt: string,
   mode = 'basic',
   customInstruction?: string,
-  model = 'doubao-1-5-vision-pro-32k-250115',
+  model = 'doubao-seed-1-6-vision-250815',
   outputFields?: OutputField[],
-  imageInput?: string | string[] | any[]
+  imageInput?: string | string[] | any[],
+  useSearch = false
 ): Promise<any> => {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
@@ -1063,34 +1148,39 @@ export const doubaoText = async (
   const hasMultipleOutputs = outputFields && outputFields.length > 0;
   const outputKeys = outputFields?.map(f => f.id) || [];
 
-  // Build messages array with system instruction and user prompt
-  const messages: Array<{ role: string; content: any }> = [];
-  
-  // Add system message if needed
-  if (baseInstruction && mode !== 'basic') {
-    messages.push({
-      role: 'system',
-      content: baseInstruction
-    });
-  }
-  
-  // Build user message content - support both text and images
-  const userContent: any[] = [];
+  // Build input content array - support both text and images
+  const inputContent: any[] = [];
   
   // Add images if provided
   if (imageInput) {
     const images = Array.isArray(imageInput) ? imageInput : [imageInput];
     const flatImages = images.flat().filter(img => img && typeof img === 'string');
-    flatImages.forEach(img => {
-      // Handle both data URLs and URLs
-      const imageUrl = img.startsWith('http') ? img : (img.includes(',') ? img : `data:image/png;base64,${img}`);
-      userContent.push({
-        type: 'image_url',
-        image_url: {
-          url: imageUrl
+    for (const img of flatImages) {
+      // Doubao API format: { "type": "input_image", "image_url": "https://..." or "data:image/..." }
+      // For HTTP URLs, use directly; for base64/data URLs, use data URL format
+      let imageUrl: string;
+      
+      if (img.startsWith('http://') || img.startsWith('https://')) {
+        // HTTP/HTTPS URLs: use directly
+        imageUrl = img;
+      } else if (img.startsWith('data:')) {
+        // Data URL: use directly (already in correct format)
+        imageUrl = img;
+      } else {
+        // Base64 string without data URL prefix: convert to data URL
+        // Try to detect mime type from common patterns
+        let mimeType = 'image/jpeg';
+        if (img.startsWith('/9j/') || img.startsWith('iVBORw0KGgo')) {
+          mimeType = img.startsWith('/9j/') ? 'image/jpeg' : 'image/png';
         }
+        imageUrl = `data:${mimeType};base64,${img}`;
+      }
+
+      inputContent.push({
+        type: 'input_image',
+        image_url: imageUrl
       });
-    });
+    }
   }
   
   // Add text content
@@ -1098,28 +1188,49 @@ export const doubaoText = async (
     ? `${promptStr}\n\nIMPORTANT: You MUST generate content for each field as JSON: ${outputKeys.join(', ')}.`
     : promptStr;
   
-  userContent.push({
-    type: 'text',
+  inputContent.push({
+    type: 'input_text',
     text: textContent
   });
   
-  messages.push({
-    role: 'user',
-    content: userContent
-  });
-
+  // Build request body for new responses API
   const requestBody: any = {
     model: model,
-    messages: messages,
-    temperature: 0.7,
+    stream: false,
+    input: [
+      {
+        role: 'user',
+        content: inputContent
+      }
+    ]
   };
 
-  // Add JSON mode for structured output if multiple outputs are required
-  if (hasMultipleOutputs) {
-    requestBody.response_format = { type: 'json_object' };
+  // Add system instruction if needed
+  if (baseInstruction && mode !== 'basic') {
+    requestBody.input.unshift({
+      role: 'system',
+      content: [
+        {
+          type: 'input_text',
+          text: baseInstruction
+        }
+      ]
+    });
   }
 
-  const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/chat/completions', {
+  // Add web search tool if useSearch is enabled
+  if (useSearch) {
+    requestBody.tools = [
+      { type: "web_search" }
+    ];
+  }
+
+  // // Add JSON mode for structured output if multiple outputs are required
+  // if (hasMultipleOutputs) {
+  //   requestBody.response_format = { type: 'json_object' };
+  // }
+
+  const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/responses', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -1141,7 +1252,72 @@ export const doubaoText = async (
   }
 
   const data = await response.json();
-  const text = data.choices?.[0]?.message?.content || "";
+  // Debug: log the full response structure for troubleshooting
+  if (useSearch) {
+    console.log('[Doubao] Full API response:', JSON.stringify(data, null, 2));
+  }
+  
+  // New API format: response.output is an array, find the message type item
+  // The message item has content array with type: "output_text"
+  let text = "";
+  if (data.output && Array.isArray(data.output)) {
+    // Find all message type outputs (usually the last one contains the final answer)
+    const messageOutputs = data.output.filter((item: any) => item.type === "message");
+    // Use the last message output (final answer)
+    const messageOutput = messageOutputs.length > 0 ? messageOutputs[messageOutputs.length - 1] : null;
+    
+    if (messageOutput && messageOutput.content && Array.isArray(messageOutput.content)) {
+      // Find all output_text items and concatenate them
+      const textContents = messageOutput.content.filter((item: any) => item.type === "output_text");
+      if (textContents.length > 0) {
+        // Concatenate all text contents
+        text = textContents.map((item: any) => item.text || "").join("");
+        if (useSearch) {
+          console.log('[Doubao] Extracted text length:', text.length, 'characters');
+        }
+      }
+    }
+    
+    // Debug log if text is empty
+    if (!text) {
+      console.warn('[Doubao] Failed to extract text from response:', JSON.stringify(data, null, 2));
+    }
+  }
+  // Fallback to old format for backward compatibility
+  if (!text) {
+    text = data.output?.[0]?.content?.[0]?.text || data.choices?.[0]?.message?.content || "";
+  }
+
+  // Post-process: extract JSON from code blocks if present
+  // The response API may return JSON wrapped in ```json ... ``` code blocks
+  if (text.includes('```json')) {
+    const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
+    if (jsonMatch && jsonMatch[1]) {
+      try {
+        const extractedJson = JSON.parse(jsonMatch[1].trim());
+        // If hasMultipleOutputs is true, return the JSON object (already in correct format)
+        if (hasMultipleOutputs) {
+          outputKeys.forEach(key => { if (!(key in extractedJson)) extractedJson[key] = "..."; });
+          return extractedJson;
+        }
+        // If hasMultipleOutputs is false but JSON contains output fields, extract the first value
+        // This handles cases where API returns { "out-text": "..." } but we want just the text
+        const jsonKeys = Object.keys(extractedJson);
+        if (jsonKeys.length === 1 && jsonKeys[0].startsWith('out-')) {
+          return extractedJson[jsonKeys[0]];
+        }
+        // If it matches expected output keys, extract the value
+        if (outputKeys.length === 1 && outputKeys[0] in extractedJson) {
+          return extractedJson[outputKeys[0]];
+        }
+        // Otherwise return the parsed JSON
+        return extractedJson;
+      } catch (e) {
+        console.warn('[Doubao] Failed to parse JSON from code block:', e);
+        // Fall through to normal processing
+      }
+    }
+  }
 
   if (hasMultipleOutputs) {
     try {
@@ -1312,4 +1488,61 @@ export const ppchatGeminiText = async (
   }
 
   return text;
+};
+
+/**
+ * DeepSeek Chat Completions API for structured JSON output
+ * Uses the /api/v3/chat/completions endpoint with JSON mode
+ */
+export const deepseekChat = async (
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+  model = 'deepseek-v3-2-251201',
+  responseFormat: 'json_object' | 'text' = 'json_object'
+): Promise<string> => {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) {
+    throw new Error("DeepSeek API key is required. Please set DEEPSEEK_API_KEY environment variable.");
+  }
+
+  const requestBody: any = {
+    model: model,
+    messages: messages
+  };
+
+  // Add response format for JSON mode
+  if (responseFormat === 'json_object') {
+    requestBody.response_format = { type: 'json_object' };
+  }
+
+  const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!response.ok) {
+    let errorMessage = `DeepSeek Chat API failed (${response.status})`;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.error?.message || errorData.error || errorMessage;
+    } catch (e) {
+      const errorText = await response.text();
+      errorMessage = errorText || errorMessage;
+    }
+    throw new Error(errorMessage);
+  }
+
+  const data = await response.json();
+  
+  // Extract content from response
+  const content = data.choices?.[0]?.message?.content || '';
+  
+  if (!content) {
+    throw new Error('Empty response from DeepSeek Chat API');
+  }
+
+  return content;
 };

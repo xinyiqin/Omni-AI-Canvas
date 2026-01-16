@@ -100,11 +100,11 @@ export const TOOLS: ToolDefinition[] = [
   {
     id: 'gemini-text',
     name: 'AI Chat (LLM)',
-    name_zh: 'AI 对话 (大模型)',
+    name_zh: '文本生成 (大模型)',
     category: 'AI Model',
     category_zh: 'AI 模型',
     description: 'Advanced reasoning and generation with multiple text outputs',
-    description_zh: '具备高级推理能力的大语言模型',
+    description_zh: '基于大语言模型的高级推理和文本生成能力',
     inputs: [
       { id: 'in-text', type: DataType.TEXT, label: 'Prompt' },
       { id: 'in-image', type: DataType.IMAGE, label: 'Image (Optional)' }
@@ -113,9 +113,9 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'Cpu',
     models: getFilteredModels([
       { id: 'deepseek-v3-2-251201', name: 'DeepSeek V3.2' },
-      { id: 'doubao-1-5-vision-pro-32k-250115', name: 'Doubao Vision Pro' },
-      { id: 'ppchat-gemini-2.5-pro', name: 'PP Chat Gemini 2.5 Pro' },
-      { id: 'ppchat-gemini-3-pro-preview', name: 'PP Chat Gemini 3 Pro' },
+      { id: 'doubao-seed-1-6-vision-250815', name: 'Doubao Seed 1.6' },
+      { id: 'ppchat-gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+      { id: 'ppchat-gemini-3-pro-preview', name: 'Gemini 3 Pro' },
       { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro' },
       { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' }
     ])
@@ -143,7 +143,7 @@ export const TOOLS: ToolDefinition[] = [
     category: 'AI Model',
     category_zh: 'AI 模型',
     description: 'Edit or transform images with text using Gemini or LightX2V',
-    description_zh: '通过文本编辑或转换图像 (可选 Gemini 或 LightX2V)',
+    description_zh: '通过文本编辑或转换图像',
     inputs: [
       { id: 'in-image', type: DataType.IMAGE, label: 'Reference Image' },
       { id: 'in-text', type: DataType.TEXT, label: 'Edit Prompt' }
@@ -151,7 +151,7 @@ export const TOOLS: ToolDefinition[] = [
     outputs: [{ id: 'out-image', type: DataType.IMAGE, label: 'Result' }],
     icon: 'Palette',
     models: getFilteredModels([
-      { id: 'Qwen-Image-Edit-2511', name: 'LightX2V (Qwen Image Edit)' },
+      { id: 'Qwen-Image-Edit-2511', name: 'LightX2V (Qwen Image Edit 2511)' },
       { id: 'gemini-2.5-flash-image', name: 'Gemini (Flash Image)' }
     ])
   },
@@ -161,7 +161,7 @@ export const TOOLS: ToolDefinition[] = [
     name_zh: '语音合成 (TTS)',
     category: 'AI Model',
     category_zh: 'AI 模型',
-    description: 'Text-to-speech conversion using Gemini or LightX2V',
+    description: 'Text-to-speech conversion',
     description_zh: '使用 Gemini 或 LightX2V 进行语音合成',
     inputs: [
       { id: 'in-text', type: DataType.TEXT, label: 'TTS Text' },
@@ -176,11 +176,11 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: 'lightx2v-voice-clone',
-    name: 'LightX2V Voice Clone',
-    name_zh: 'LightX2V 音色克隆',
+    name: 'Voice Clone',
+    name_zh: '音色克隆',
     category: 'AI Model',
     category_zh: 'AI 模型',
-    description: 'Clone voice from audio and generate TTS with cloned voice using LightX2V',
+    description: 'Clone voice from audio and generate TTS with cloned voice',
     description_zh: '从音频克隆音色，并使用克隆的音色生成语音',
     inputs: [
       { id: 'in-tts-text', type: DataType.TEXT, label: 'TTS Text' }
@@ -195,8 +195,8 @@ export const TOOLS: ToolDefinition[] = [
     name_zh: '文生视频',
     category: 'AI Model',
     category_zh: 'AI 模型',
-    description: 'Generate video from text (Wan 2.2)',
-    description_zh: '根据文本生成视频短片 (Wan 2.2)',
+    description: 'Generate video from text',
+    description_zh: '根据文本生成视频短片',
     inputs: [{ id: 'in-text', type: DataType.TEXT, label: 'Prompt' }],
     outputs: [{ id: 'out-video', type: DataType.VIDEO, label: 'Video' }],
     icon: 'Video',
@@ -210,8 +210,8 @@ export const TOOLS: ToolDefinition[] = [
     name_zh: '图生视频',
     category: 'AI Model',
     category_zh: 'AI 模型',
-    description: 'Generate video from a starting image (Wan 2.2)',
-    description_zh: '以起始图像生成动感视频 (Wan 2.2)',
+    description: 'Generate video from a starting image',
+    description_zh: '以起始图像生成动感视频',
     inputs: [
       { id: 'in-image', type: DataType.IMAGE, label: 'Start Frame' },
       { id: 'in-text', type: DataType.TEXT, label: 'Motion Prompt' }
@@ -229,7 +229,7 @@ export const TOOLS: ToolDefinition[] = [
     category: 'AI Model',
     category_zh: 'AI 模型',
     description: 'Generate video with start and end frame constraints (Wan 2.2)',
-    description_zh: '通过首尾两张图像及其描述生成过渡视频 (Wan 2.2)',
+    description_zh: '通过首尾两张图像及其描述生成过渡视频',
     inputs: [
       { id: 'in-image-start', type: DataType.IMAGE, label: 'Start Frame' },
       { id: 'in-image-end', type: DataType.IMAGE, label: 'End Frame' },
@@ -243,8 +243,8 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: 'avatar-gen',
-    name: 'Digital Avatar (S2V)',
-    name_zh: '数字人 (音频驱动)',
+    name: 'Digital Avatar (Lip Sync)',
+    name_zh: '数字人 (口型对齐)',
     category: 'AI Model',
     category_zh: 'AI 模型',
     description: 'Speech-to-Video talking avatar powered by LightX2V SekoTalk',
@@ -257,7 +257,7 @@ export const TOOLS: ToolDefinition[] = [
     outputs: [{ id: 'out-video', type: DataType.VIDEO, label: 'Avatar Video' }],
     icon: 'UserCircle',
     models: [
-      { id: 'SekoTalk', name: 'SekoTalk' }
+      { id: 'LightX2V-SekoTalk', name: 'LightX2V SekoTalk' }
     ]
   },
   {
