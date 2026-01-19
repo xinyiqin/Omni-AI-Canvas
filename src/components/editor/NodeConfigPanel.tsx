@@ -47,6 +47,8 @@ interface NodeConfigPanelProps {
   onDeleteNode: (nodeId: string) => void;
   onGlobalInputChange: (nodeId: string, portId: string, value: any) => void;
   onShowCloneVoiceModal: () => void;
+  collapsed?: boolean;
+  style?: React.CSSProperties;
 }
 
 export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
@@ -71,14 +73,19 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
   onUpdateNodeData,
   onDeleteNode,
   onGlobalInputChange,
-  onShowCloneVoiceModal
+  onShowCloneVoiceModal,
+  collapsed = false,
+  style
 }) => {
   const { t } = useTranslation(lang);
   const selectedNode = selectedNodeId ? workflow.nodes.find(n => n.id === selectedNodeId) : null;
 
   if (selectedNodeId && selectedNode) {
-    return (
-      <aside className="w-80 border-l border-slate-800/60 bg-slate-900/40 backdrop-blur-xl flex flex-col z-30 p-6 overflow-y-auto">
+      return (
+        <aside 
+          className={`flex flex-col z-30 transition-all ${collapsed ? 'h-0 overflow-hidden' : 'p-6 overflow-y-auto'}`}
+          style={style}
+      >
         <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
@@ -101,7 +108,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                 <select
                   value={selectedNode.data.model}
                   onChange={e => onUpdateNodeData(selectedNode.id, 'model', e.target.value)}
-                  className="w-full bg-slate-800 rounded-xl p-3 text-xs border border-slate-700 focus:border-indigo-500 transition-all"
+                  className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
                 >
                   {TOOLS.find(t => t.id === selectedNode.toolId)?.models?.map(m => (
                     <option key={m.id} value={m.id}>{m.name}</option>
@@ -111,7 +118,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
             )}
 
             {/* Web Search Toggle for DeepSeek and Doubao */}
-            {selectedNode.toolId === 'gemini-text' && 
+            {selectedNode.toolId === 'text-generation' && 
               (selectedNode.data.model?.startsWith('deepseek-') || selectedNode.data.model?.startsWith('doubao-')) && (
               <div className="space-y-2">
                 <span className="text-[10px] text-slate-500 font-black uppercase flex items-center gap-2">
@@ -132,14 +139,14 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
             )}
 
             {/* Gemini Text Mode */}
-            {selectedNode.toolId === 'gemini-text' && (
+            {selectedNode.toolId === 'text-generation' && (
               <div className="space-y-6">
                 <div className="space-y-2">
                   <span className="text-[10px] text-slate-500 font-black uppercase">{t('mode')}</span>
                   <select
                     value={selectedNode.data.mode}
                     onChange={e => onUpdateNodeData(selectedNode.id, 'mode', e.target.value)}
-                    className="w-full bg-slate-800 rounded-xl p-3 text-xs border border-slate-700"
+                    className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
                   >
                     {['basic', 'enhance', 'summarize', 'polish', 'custom'].map(m => (
                       <option key={m} value={m}>{m.toUpperCase()}</option>
@@ -217,7 +224,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                 <select
                   value={selectedNode.data.aspectRatio}
                   onChange={e => onUpdateNodeData(selectedNode.id, 'aspectRatio', e.target.value)}
-                  className="w-full bg-slate-800 rounded-xl p-3 text-xs border border-slate-700"
+                  className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
                 >
                   {selectedNode.toolId.includes('video-gen')
                     ? ['16:9', '9:16'].map(r => <option key={r} value={r}>{r}</option>)
@@ -238,7 +245,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                     <select
                       value={selectedNode.data.voice || 'Kore'}
                       onChange={e => onUpdateNodeData(selectedNode.id, 'voice', e.target.value)}
-                      className="w-full bg-slate-800 rounded-xl p-3 text-xs border border-slate-700"
+                      className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
                     >
                       {['Kore', 'Puck', 'Fenrir', 'Charon', 'Zephyr'].map(v => (
                         <option key={v} value={v}>{v}</option>
@@ -287,7 +294,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                               <select
                                 value={voiceFilterGender}
                                 onChange={e => setVoiceFilterGender(e.target.value)}
-                                className="w-full bg-slate-900 rounded-lg px-3 py-1.5 text-xs border border-slate-700 text-slate-300"
+                                className="w-full bg-slate-900/80 hover:bg-slate-900 rounded-lg px-3 py-1.5 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:16px_16px] bg-[right_8px_center] bg-no-repeat pr-8 shadow-sm"
                               >
                                 <option value="all">All</option>
                                 <option value="female">Female</option>
@@ -369,7 +376,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                       <select
                         value={selectedNode.data.emotion || ''}
                         onChange={e => onUpdateNodeData(selectedNode.id, 'emotion', e.target.value)}
-                        className="w-full bg-slate-800 rounded-xl p-3 text-xs border border-slate-700"
+                        className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
                       >
                         <option value="">None</option>
                         {lightX2VVoiceList.emotions.map((emotion: string, index: number) => (
@@ -457,7 +464,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                     <select
                       value={selectedNode.data.speakerId || ''}
                       onChange={e => onUpdateNodeData(selectedNode.id, 'speakerId', e.target.value)}
-                      className="w-full bg-slate-800 rounded-xl p-3 text-xs border border-slate-700"
+                      className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
                     >
                       <option value="">Select a cloned voice...</option>
                       {cloneVoiceList.map((voice: any) => (
@@ -527,7 +534,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                     <select
                       value={selectedNode.data.language || 'ZH_CN'}
                       onChange={e => onUpdateNodeData(selectedNode.id, 'language', e.target.value)}
-                      className="w-full bg-slate-800 rounded-xl p-3 text-xs border border-slate-700"
+                      className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
                     >
                       {['ZH_CN', 'EN_US', 'ZH_CN_SICHUAN', 'ZH_CN_HK'].map(l => (
                         <option key={l} value={l}>{l}</option>
@@ -549,7 +556,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                   if (!conn) return null;
 
                   const sourceNode = workflow.nodes.find(n => n.id === conn.sourceNodeId);
-                  if (!sourceNode || sourceNode.toolId !== 'gemini-text' || !sourceNode.data.customOutputs) return null;
+                  if (!sourceNode || sourceNode.toolId !== 'text-generation' || !sourceNode.data.customOutputs) return null;
 
                   const isCustomOutput = sourceNode.data.customOutputs.some((o: any) => o.id === conn.sourcePortId);
                   if (!isCustomOutput) return null;

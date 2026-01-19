@@ -3,6 +3,93 @@
 import { WorkflowState, NodeStatus } from './types';
 
 export const PRESET_WORKFLOWS: WorkflowState[] = [
+  // 宫崎骏风格治愈动画视频工作流
+  {
+    id: 'preset-miyazaki-healing-video',
+    name: '宫崎骏风格治愈动画视频',
+    updatedAt: Date.now(),
+    nodes: [
+      {
+        id: 'node-scene-text',
+        toolId: 'text-prompt',
+        x: 100,
+        y: 200,
+        data: {
+          value: '宫崎骏风格的治愈场景：宁静的乡村小屋，远处是连绵的绿色山丘，天空中有几朵白云，温暖的阳光洒在大地上，远处有风车在缓缓转动。整体色调柔和，充满自然气息。'
+        },
+        status: NodeStatus.IDLE,
+        error: null
+      },
+      {
+        id: 'node-scene-image',
+        toolId: 'text-to-image',
+        x: 500,
+        y: 200,
+        data: {
+          value: '',
+          model: 'Qwen-Image-2512',
+          aspectRatio: '16:9'
+        },
+        status: NodeStatus.IDLE,
+        error: null
+      },
+      {
+        id: 'node-motion-text',
+        toolId: 'text-prompt',
+        x: 500,
+        y: 400,
+        data: {
+          value: '镜头缓慢向前推进，云朵在天空中缓缓飘动，风车叶片缓慢旋转，阳光透过云层洒下光影变化，整体氛围宁静治愈，多个镜头自然过渡'
+        },
+        status: NodeStatus.IDLE,
+        error: null
+      },
+      {
+        id: 'node-video',
+        toolId: 'video-gen-image',
+        x: 900,
+        y: 300,
+        data: {
+          value: '',
+          model: 'Wan2.2_I2V_A14B_distilled'
+        },
+        status: NodeStatus.IDLE,
+        error: null
+      }
+    ],
+    connections: [
+      {
+        id: 'conn-scene-text-to-image',
+        sourceNodeId: 'node-scene-text',
+        sourcePortId: 'out-text',
+        targetNodeId: 'node-scene-image',
+        targetPortId: 'in-text'
+      },
+      {
+        id: 'conn-image-to-video',
+        sourceNodeId: 'node-scene-image',
+        sourcePortId: 'out-image',
+        targetNodeId: 'node-video',
+        targetPortId: 'in-image'
+      },
+      {
+        id: 'conn-motion-to-video',
+        sourceNodeId: 'node-motion-text',
+        sourcePortId: 'out-text',
+        targetNodeId: 'node-video',
+        targetPortId: 'in-text'
+      }
+    ],
+    isDirty: false,
+    isRunning: false,
+    globalInputs: {},
+    env: {
+      lightx2v_url: (process.env.LIGHTX2V_URL || 'https://x2v.light-ai.top').trim(),
+      lightx2v_token: (process.env.LIGHTX2V_TOKEN || '').trim()
+    },
+    history: [],
+    showIntermediateResults: true
+  },
   {
     id: 'preset-knowledge-ip',
     name: '知识IP口播工作流',
@@ -28,7 +115,7 @@ export const PRESET_WORKFLOWS: WorkflowState[] = [
     nodes: [
       { id: 'ip-node-url', toolId: 'text-prompt', x: 50, y: 200, status: NodeStatus.IDLE, data: { value: "https://github.com/ModelTC/LightX2V/blob/main/README_zh.md" } },
       { id: 'ip-node-image-ref', toolId: 'image-input', x: 50, y: 400, status: NodeStatus.IDLE, data: { value: ['/assets/programmer.png'] } },
-      { id: 'ip-node-ai', toolId: 'gemini-text', x: 450, y: 300, status: NodeStatus.IDLE, data: { 
+      { id: 'ip-node-ai', toolId: 'text-generation', x: 450, y: 300, status: NodeStatus.IDLE, data: { 
           model: 'doubao-seed-1-6-vision-250815',
           mode: 'custom',
           useSearch: true,
@@ -125,7 +212,7 @@ export const PRESET_WORKFLOWS: WorkflowState[] = [
         { id: 'prod-node-product', toolId: 'image-input', x: 50, y: 400, status: NodeStatus.IDLE, data: { value: ['/assets/product_glass.png'] } },
         { id: 'prod-node-text', toolId: 'text-prompt', x: 50, y: 600, status: NodeStatus.IDLE, data: { value: "" } },
         // AI Chat Planner (Doubao Vision)
-        { id: 'prod-node-planner', toolId: 'gemini-text', x: 450, y: 400, status: NodeStatus.IDLE, data: { 
+        { id: 'prod-node-planner', toolId: 'text-generation', x: 450, y: 400, status: NodeStatus.IDLE, data: { 
             model: 'doubao-seed-1-6-vision-250815',
             mode: 'custom',
             customInstruction: `你是一位专业的虚拟人产品展示创意总监。你的任务是根据输入的人物图片、产品图片和可选的文字描述，生成详细的图生图修改提示词和视频运镜提示词。
@@ -221,7 +308,7 @@ export const PRESET_WORKFLOWS: WorkflowState[] = [
       nodes: [
         { id: 'node-img-in', toolId: 'image-input', x: 50, y: 50, status: NodeStatus.IDLE, data: { value: ['/assets/girl.jpg'] } },
         { id: 'node-text-in', toolId: 'text-prompt', x: 50, y: 350, status: NodeStatus.IDLE, data: { value: "女孩改为穿着性感纯欲的睡衣坐在床上，用性感迷人的声音说着勾人的话" } },
-        { id: 'node-logic', toolId: 'gemini-text', x: 450, y: 350, status: NodeStatus.IDLE, data: { 
+        { id: 'node-logic', toolId: 'text-generation', x: 450, y: 350, status: NodeStatus.IDLE, data: { 
             model: 'doubao-seed-1-6-vision-250815',
             mode: 'custom',
             customInstruction: `你是一位专业的数字人视频创意总监。你的任务是根据输入的人物图片和文字描述，生成同步的数字人视频组件。
@@ -325,7 +412,7 @@ export const PRESET_WORKFLOWS: WorkflowState[] = [
         { id: 'node-char-img', toolId: 'image-input', x: 50, y: 500, status: NodeStatus.IDLE, data: { value: ['/assets/princess.png'] } },
         { id: 'node-desc', toolId: 'text-prompt', x: 50, y: 200, status: NodeStatus.IDLE, data: { value: "冰雪奇缘中的艾莎公主早晨醒来，在温馨的房间里梳妆打扮，然后望向窗外，窗外是很漂亮的阿伦黛尔小镇风光，然后镜头转向远景能够看到艾莎公主在窗边伸了个懒腰" } },
         // Planner node
-        { id: 'node-planner', toolId: 'gemini-text', x: 450, y: 350, status: NodeStatus.IDLE, data: { 
+        { id: 'node-planner', toolId: 'text-generation', x: 450, y: 350, status: NodeStatus.IDLE, data: { 
             model: 'doubao-seed-1-6-vision-250815',
             mode: 'custom',
             customInstruction: `你是一位专业的视频故事板规划师。你的任务是根据输入描述和人物图片，将其分解为恰好9个场景（分镜）用于顺序图像生成。
@@ -503,7 +590,7 @@ export const PRESET_WORKFLOWS: WorkflowState[] = [
         { id: 'node-audio-in', toolId: 'audio-input', x: 50, y: 700, status: NodeStatus.IDLE, data: { value: '/assets/let_it_go_part.wav' } },
         { id: 'node-text-in', toolId: 'text-prompt', x: 50, y: 200, status: NodeStatus.IDLE, data: { value: "冰雪奇缘中的艾莎公主正在演唱《Let It Go》，动作优雅，表情充满自信和力量" } },
         // AI Chat Planner (Doubao Vision)
-        { id: 'node-planner', toolId: 'gemini-text', x: 450, y: 400, status: NodeStatus.IDLE, data: { 
+        { id: 'node-planner', toolId: 'text-generation', x: 450, y: 400, status: NodeStatus.IDLE, data: { 
             model: 'doubao-seed-1-6-vision-250815',
             mode: 'custom',
             customInstruction: `你是一位专业的音乐视频多机位导演。你的任务是根据输入的角色图片和可选的文字描述，为演唱表演生成9个不同机位的详细描述。
@@ -623,7 +710,7 @@ export const PRESET_WORKFLOWS: WorkflowState[] = [
         { id: 'chibi-node-person', toolId: 'image-input', x: 50, y: 200, status: NodeStatus.IDLE, data: { value: [] } },
         { id: 'chibi-node-doll-ref', toolId: 'image-input', x: 50, y: 50, status: NodeStatus.IDLE, data: { value: ['/assets/doll.jpg'] } },
         { id: 'chibi-node-input', toolId: 'text-prompt', x: 50, y: 400, status: NodeStatus.IDLE, data: { value: "角色说的话和角色背景描述" } },
-        { id: 'chibi-node-ai', toolId: 'gemini-text', x: 450, y: 300, status: NodeStatus.IDLE, data: { 
+        { id: 'chibi-node-ai', toolId: 'text-generation', x: 450, y: 300, status: NodeStatus.IDLE, data: { 
             model: 'doubao-seed-1-6-vision-250815',
             mode: 'custom',
             customInstruction: `你是一位专业的Q版数字人视频创意总监。你的任务是根据输入的人物图片和用户描述（角色说的话和角色背景），生成完整的Q版数字人视频组件。
@@ -722,7 +809,7 @@ export const PRESET_WORKFLOWS: WorkflowState[] = [
       ],
       nodes: [
         { id: 'oner-node-desc', toolId: 'text-prompt', x: 50, y: 400, status: NodeStatus.IDLE, data: { value: "一座未来主义赛博朋克城市的宏大全景，从高空俯瞰整座城市，镜头逐渐下降穿过云雾，掠过摩天大楼的玻璃幕墙，最终聚焦到繁华街道上的人群和霓虹灯" } },
-        { id: 'oner-node-planner', toolId: 'gemini-text', x: 450, y: 400, status: NodeStatus.IDLE, data: { 
+        { id: 'oner-node-planner', toolId: 'text-generation', x: 450, y: 400, status: NodeStatus.IDLE, data: { 
             model: 'deepseek-v3-2-251201',
             mode: 'custom',
             customInstruction: `你是一位专业的电影级视频分镜设计师。你的任务是根据用户的场景描述，设计一个"一镜到底"的连续运镜视频。
@@ -828,7 +915,7 @@ export const PRESET_WORKFLOWS: WorkflowState[] = [
         ],
         nodes: [
           { id: 'node-input', toolId: 'text-prompt', x: 50, y: 300, status: NodeStatus.IDLE, data: { value: "一座未来主义赛博朋克城市，从白天逐渐过渡到雨夜。" } },
-          { id: 'node-planner', toolId: 'gemini-text', x: 450, y: 300, status: NodeStatus.IDLE, data: { 
+          { id: 'node-planner', toolId: 'text-generation', x: 450, y: 300, status: NodeStatus.IDLE, data: { 
               model: 'deepseek-v3-2-251201',
               mode: 'custom',
               customInstruction: `You are a video planning assistant. Analyze the input description and generate detailed prompts for the start frame, end frame, and video motion.
@@ -874,7 +961,7 @@ export const PRESET_WORKFLOWS: WorkflowState[] = [
         ],
         nodes: [
           { id: 'node-prompt', toolId: 'text-prompt', x: 50, y: 200, status: NodeStatus.IDLE, data: { value: "一只哈士奇程序员狗，戴着耳机和工卡在办公，吐槽自己的程序员日常。用一些网络热梗。" } },
-          { id: 'node-chat', toolId: 'gemini-text', x: 450, y: 200, status: NodeStatus.IDLE, data: { 
+          { id: 'node-chat', toolId: 'text-generation', x: 450, y: 200, status: NodeStatus.IDLE, data: { 
               model: 'deepseek-v3-2-251201',
               mode: 'custom',
               customInstruction: `你是一位专业的数字人视频脚本编写者。你的任务是根据用户的输入描述，为数字人视频创建完整的脚本包。

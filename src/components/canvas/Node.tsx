@@ -690,7 +690,7 @@ export const Node: React.FC<NodeProps> = ({
         )}
 
         {/* Web search toggle for DeepSeek and Doubao models */}
-        {node.toolId === 'gemini-text' && 
+        {node.toolId === 'text-generation' && 
           (node.data.model?.startsWith('deepseek-') || node.data.model?.startsWith('doubao-')) && (
           <button
             onMouseDown={(e) => e.stopPropagation()}

@@ -19,10 +19,12 @@ const hasEnvVar = (key: string): boolean => {
   }
 };
 
+import { ModelDefinition } from './types';
+
 /**
  * Get the filtered models based on available API keys
  */
-const getFilteredModels = (models: Array<{ id: string; name: string }>): Array<{ id: string; name: string }> => {
+const getFilteredModels = (models: ModelDefinition[]): ModelDefinition[] => {
   return models.filter(model => {
     // Map model IDs to their required environment variables
     const modelEnvMap: Record<string, string[]> = {
@@ -98,7 +100,7 @@ export const TOOLS: ToolDefinition[] = [
     icon: 'Video'
   },
   {
-    id: 'gemini-text',
+    id: 'text-generation',
     name: 'AI Chat (LLM)',
     name_zh: '文本生成 (大模型)',
     category: 'AI Model',
@@ -111,13 +113,59 @@ export const TOOLS: ToolDefinition[] = [
     ],
     outputs: [], // Dynamically managed via node.data.customOutputs
     icon: 'Cpu',
+    defaultParams: {
+      mode: 'basic',
+      customOutputs: [{ id: 'out-text', label: '执行结果', description: 'Main text response.' }]
+    },
     models: getFilteredModels([
-      { id: 'deepseek-v3-2-251201', name: 'DeepSeek V3.2' },
-      { id: 'doubao-seed-1-6-vision-250815', name: 'Doubao Seed 1.6' },
-      { id: 'ppchat-gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-      { id: 'ppchat-gemini-3-pro-preview', name: 'Gemini 3 Pro' },
-      { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro' },
-      { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' }
+      { 
+        id: 'deepseek-v3-2-251201', 
+        name: 'DeepSeek V3.2',
+        defaultParams: {
+          mode: 'basic',
+          customOutputs: [{ id: 'out-text', label: '执行结果', description: 'Main text response.' }]
+        }
+      },
+      { 
+        id: 'doubao-seed-1-6-vision-250815', 
+        name: 'Doubao Seed 1.6',
+        defaultParams: {
+          mode: 'basic',
+          customOutputs: [{ id: 'out-text', label: '执行结果', description: 'Main text response.' }]
+        }
+      },
+      { 
+        id: 'ppchat-gemini-2.5-flash', 
+        name: 'Gemini 2.5 Flash',
+        defaultParams: {
+          mode: 'basic',
+          customOutputs: [{ id: 'out-text', label: '执行结果', description: 'Main text response.' }]
+        }
+      },
+      { 
+        id: 'ppchat-gemini-3-pro-preview', 
+        name: 'Gemini 3 Pro',
+        defaultParams: {
+          mode: 'basic',
+          customOutputs: [{ id: 'out-text', label: '执行结果', description: 'Main text response.' }]
+        }
+      },
+      { 
+        id: 'gemini-3-pro-preview', 
+        name: 'Gemini 3 Pro',
+        defaultParams: {
+          mode: 'basic',
+          customOutputs: [{ id: 'out-text', label: '执行结果', description: 'Main text response.' }]
+        }
+      },
+      { 
+        id: 'gemini-3-flash-preview', 
+        name: 'Gemini 3 Flash',
+        defaultParams: {
+          mode: 'basic',
+          customOutputs: [{ id: 'out-text', label: '执行结果', description: 'Main text response.' }]
+        }
+      }
     ])
   },
   {
@@ -131,9 +179,24 @@ export const TOOLS: ToolDefinition[] = [
     inputs: [{ id: 'in-text', type: DataType.TEXT, label: 'Prompt' }],
     outputs: [{ id: 'out-image', type: DataType.IMAGE, label: 'Image' }],
     icon: 'Sparkles',
+    defaultParams: {
+      aspectRatio: '1:1'
+    },
     models: getFilteredModels([
-      { id: 'Qwen-Image-2512', name: 'LightX2V (Qwen Image 2.5)' },
-      { id: 'gemini-2.5-flash-image', name: 'Gemini (Flash Image)' }
+      { 
+        id: 'Qwen-Image-2512', 
+        name: 'LightX2V (Qwen Image 2.5)',
+        defaultParams: {
+          aspectRatio: '1:1'
+        }
+      },
+      { 
+        id: 'gemini-2.5-flash-image', 
+        name: 'Gemini (Flash Image)',
+        defaultParams: {
+          aspectRatio: '1:1'
+        }
+      }
     ])
   },
   {
@@ -150,9 +213,24 @@ export const TOOLS: ToolDefinition[] = [
     ],
     outputs: [{ id: 'out-image', type: DataType.IMAGE, label: 'Result' }],
     icon: 'Palette',
+    defaultParams: {
+      aspectRatio: '1:1'
+    },
     models: getFilteredModels([
-      { id: 'Qwen-Image-Edit-2511', name: 'LightX2V (Qwen Image Edit 2511)' },
-      { id: 'gemini-2.5-flash-image', name: 'Gemini (Flash Image)' }
+      { 
+        id: 'Qwen-Image-Edit-2511', 
+        name: 'LightX2V (Qwen Image Edit 2511)',
+        defaultParams: {
+          aspectRatio: '1:1'
+        }
+      },
+      { 
+        id: 'gemini-2.5-flash-image', 
+        name: 'Gemini (Flash Image)',
+        defaultParams: {
+          aspectRatio: '1:1'
+        }
+      }
     ])
   },
   {
@@ -169,9 +247,29 @@ export const TOOLS: ToolDefinition[] = [
     ],
     outputs: [{ id: 'out-audio', type: DataType.AUDIO, label: 'Audio' }],
     icon: 'Volume2',
+    defaultParams: {
+      model: 'lightx2v'
+    },
     models: getFilteredModels([
-      { id: 'lightx2v', name: 'LightX2V TTS' },
-      { id: 'gemini-2.5-flash-preview-tts', name: 'Gemini 2.5 TTS' }
+      { 
+        id: 'lightx2v', 
+        name: 'LightX2V TTS',
+        defaultParams: {
+          voiceType: 'zh_female_vv_uranus_bigtts',
+          emotionScale: 3,
+          speechRate: 0,
+          pitch: 0,
+          loudnessRate: 0,
+          resourceId: ''
+        }
+      },
+      { 
+        id: 'gemini-2.5-flash-preview-tts', 
+        name: 'Gemini 2.5 TTS',
+        defaultParams: {
+          voice: 'Kore'
+        }
+      }
     ])
   },
   {
@@ -187,6 +285,13 @@ export const TOOLS: ToolDefinition[] = [
     ],
     outputs: [{ id: 'out-audio', type: DataType.AUDIO, label: 'Audio' }],
     icon: 'Mic',
+    defaultParams: {
+      style: '正常',
+      speed: 1.0,
+      volume: 0,
+      pitch: 0,
+      language: 'ZH_CN'
+    },
     models: []
   },
   {
@@ -200,8 +305,17 @@ export const TOOLS: ToolDefinition[] = [
     inputs: [{ id: 'in-text', type: DataType.TEXT, label: 'Prompt' }],
     outputs: [{ id: 'out-video', type: DataType.VIDEO, label: 'Video' }],
     icon: 'Video',
+    defaultParams: {
+      aspectRatio: '16:9'
+    },
     models: [
-      { id: 'Wan2.2_T2V_A14B_distilled', name: 'Wan 2.2 T2V' }
+      { 
+        id: 'Wan2.2_T2V_A14B_distilled', 
+        name: 'Wan 2.2 T2V',
+        defaultParams: {
+          aspectRatio: '16:9'
+        }
+      }
     ]
   },
   {
@@ -218,8 +332,17 @@ export const TOOLS: ToolDefinition[] = [
     ],
     outputs: [{ id: 'out-video', type: DataType.VIDEO, label: 'Video' }],
     icon: 'Clapperboard',
+    defaultParams: {
+      aspectRatio: '16:9'
+    },
     models: [
-      { id: 'Wan2.2_I2V_A14B_distilled', name: 'Wan 2.2 I2V' }
+      { 
+        id: 'Wan2.2_I2V_A14B_distilled', 
+        name: 'Wan 2.2 I2V',
+        defaultParams: {
+          aspectRatio: '16:9'
+        }
+      }
     ]
   },
   {
@@ -237,8 +360,17 @@ export const TOOLS: ToolDefinition[] = [
     ],
     outputs: [{ id: 'out-video', type: DataType.VIDEO, label: 'Video' }],
     icon: 'FastForward',
+    defaultParams: {
+      aspectRatio: '16:9'
+    },
     models: [
-      { id: 'Wan2.2_I2V_A14B_distilled', name: 'Wan 2.2 I2V' }
+      { 
+        id: 'Wan2.2_I2V_A14B_distilled', 
+        name: 'Wan 2.2 I2V',
+        defaultParams: {
+          aspectRatio: '16:9'
+        }
+      }
     ]
   },
   {
@@ -257,7 +389,7 @@ export const TOOLS: ToolDefinition[] = [
     outputs: [{ id: 'out-video', type: DataType.VIDEO, label: 'Avatar Video' }],
     icon: 'UserCircle',
     models: [
-      { id: 'LightX2V-SekoTalk', name: 'LightX2V SekoTalk' }
+      { id: 'SekoTalk', name: 'SekoTalk' }
     ]
   },
   {

@@ -1491,6 +1491,80 @@ export const ppchatGeminiText = async (
 };
 
 /**
+ * PP Chat OpenAI-format Chat Completions API
+ * Uses the /v1/chat/completions endpoint with OpenAI-compatible format
+ */
+export const ppchatChatCompletions = async (
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+  model = 'gemini-3-pro-preview',
+  responseFormat: 'json_object' | 'text' = 'json_object'
+): Promise<string> => {
+  const apiKey = process.env.PPCHAT_API_KEY;
+  if (!apiKey) {
+    throw new Error("PP Chat API key is required. Please set PPCHAT_API_KEY environment variable.");
+  }
+
+  // 根据 OpenAI 格式，messages 数组应该支持 system、user、assistant 角色
+  // 直接使用 messages，但确保格式正确
+  const formattedMessages = messages.map(msg => ({
+    role: msg.role,
+    content: msg.content
+  }));
+
+  const requestBody: any = {
+    model: model,
+    stream: false,
+    messages: formattedMessages
+  };
+
+  // 添加 JSON 模式支持
+  if (responseFormat === 'json_object') {
+    requestBody.response_format = { type: 'json_object' };
+  }
+
+  // 构建 Cookie header（如果需要）
+  const cookieValue = process.env.PPCHAT_COOKIE || '';
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${apiKey}`
+  };
+  
+  // 如果有 Cookie，添加到 headers
+  if (cookieValue) {
+    headers['Cookie'] = cookieValue;
+  }
+
+  const response = await fetch('https://api.ppchat.vip/v1/chat/completions', {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!response.ok) {
+    let errorMessage = `PP Chat API failed (${response.status})`;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.error?.message || errorData.error || errorMessage;
+    } catch (e) {
+      const errorText = await response.text();
+      errorMessage = errorText || errorMessage;
+    }
+    throw new Error(errorMessage);
+  }
+
+  const data = await response.json();
+  
+  // 提取 content 从 OpenAI 格式的响应
+  const content = data.choices?.[0]?.message?.content || '';
+  
+  if (!content) {
+    throw new Error('Empty response from PP Chat API');
+  }
+
+  return content;
+};
+
+/**
  * DeepSeek Chat Completions API for structured JSON output
  * Uses the /api/v3/chat/completions endpoint with JSON mode
  */

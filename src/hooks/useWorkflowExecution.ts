@@ -318,8 +318,8 @@ export const useWorkflowExecution = ({
                         }
                       }
                       
-                      // Check if this is a multi-output node (like gemini-text with customOutputs)
-                      if (sourceNode.toolId === 'gemini-text' && sourceNode.data.customOutputs && typeof inputValue === 'object' && inputValue !== null) {
+                      // Check if this is a multi-output node (like text-generation with customOutputs)
+                      if (sourceNode.toolId === 'text-generation' && sourceNode.data.customOutputs && typeof inputValue === 'object' && inputValue !== null) {
                         return c.sourcePortId in inputValue ? inputValue[c.sourcePortId] : inputValue;
                       }
                       return inputValue;
@@ -406,7 +406,7 @@ export const useWorkflowExecution = ({
                   break;
                 case 'video-input': result = node.data.value; break;
                 case 'web-search': result = await geminiText(nodeInputs['in-text'] || "Search query", true, 'basic', undefined, model); break;
-                case 'gemini-text': 
+                case 'text-generation': 
                   const outputFields = (node.data.customOutputs || []).map((o: any) => ({ id: o.id, description: o.description || o.label }));
                   const useSearch = node.data.useSearch || false;
                   // Use DeepSeek for deepseek models, Doubao for doubao models, PP Chat for ppchat models, otherwise use Gemini

@@ -36,6 +36,8 @@ import { useModalState } from './src/hooks/useModalState';
 import { useResultManagement } from './src/hooks/useResultManagement';
 import { useAIGenerateWorkflow } from './src/hooks/useAIGenerateWorkflow';
 import { useWorkflowExecution } from './src/hooks/useWorkflowExecution';
+import { useUndoRedo } from './src/hooks/useUndoRedo';
+import { useAIChatWorkflow } from './src/hooks/useAIChatWorkflow';
 
 // --- Main App ---
 
@@ -93,6 +95,12 @@ const App: React.FC = () => {
   // Use useModalState Hook
   const modalState = useModalState();
   
+  // Use useUndoRedo Hook
+  const undoRedo = useUndoRedo({
+    workflow,
+    setWorkflow
+  });
+  
   const [ticker, setTicker] = useState(0);
   const [validationErrors, setValidationErrors] = useState<{ message: string; type: 'ENV' | 'INPUT' }[]>([]);
   const [globalError, setGlobalError] = useState<{ message: string; details?: string } | null>(null);
@@ -120,7 +128,7 @@ const App: React.FC = () => {
   // Helper function to get node outputs (needed by hooks)
   const getNodeOutputs = (node: WorkflowNode): Port[] => {
     const tool = TOOLS.find(t => t.id === node.toolId);
-    if (node.toolId === 'gemini-text' && node.data.customOutputs) return node.data.customOutputs.map((o: any) => ({ ...o, type: DataType.TEXT }));
+    if (node.toolId === 'text-generation' && node.data.customOutputs) return node.data.customOutputs.map((o: any) => ({ ...o, type: DataType.TEXT }));
     return tool?.outputs || [];
   };
 
@@ -191,6 +199,26 @@ const App: React.FC = () => {
       setIsGeneratingWorkflow(false);
     }
   }, [aiGenerateWorkflow, modalState, setAIWorkflowDescription, setGlobalError, t]);
+
+  // Use useAIChatWorkflow Hook
+  const aiChatWorkflow = useAIChatWorkflow({
+    workflow,
+    setWorkflow,
+    addNode: nodeManagement.addNode,
+    deleteNode: nodeManagement.deleteNode,
+    updateNodeData: nodeManagement.updateNodeData,
+    replaceNode: nodeManagement.replaceNode,
+    addConnection: connectionManagement.addConnection,
+    deleteConnection: connectionManagement.deleteConnection,
+    getNodeOutputs,
+    getReplaceableTools: nodeManagement.getReplaceableTools,
+    screenToWorldCoords,
+    canvasRef,
+    lang,
+    lightX2VVoiceList: voiceList.lightX2VVoiceList,
+    getCurrentHistoryIndex: undoRedo.getCurrentHistoryIndex,
+    undoToIndex: undoRedo.undoToIndex
+  });
 
   // Use useWorkflowExecution Hook
   const workflowExecution = useWorkflowExecution({
@@ -289,8 +317,10 @@ const App: React.FC = () => {
     setActiveOutputs({});
     voiceList.resetVoiceList(); // Reset voice list when switching workflows
     voiceList.resetCloneVoiceList(); // Reset clone voice list
-    setWorkflow({ ...w, isDirty: false, isRunning: false, env: w.env || { lightx2v_url: '', lightx2v_token: '' } });
+    const newWorkflow = { ...w, isDirty: false, isRunning: false, env: w.env || { lightx2v_url: '', lightx2v_token: '' } };
+    setWorkflow(newWorkflow);
     setCurrentView('EDITOR');
+    // History will be automatically initialized by useUndoRedo when workflow changes
   };
 
   const createNewWorkflow = () => {
@@ -320,6 +350,7 @@ const App: React.FC = () => {
     };
     setWorkflow(newFlow);
     setCurrentView('EDITOR');
+    // History will be automatically initialized by useUndoRedo when workflow changes
   };
 
   const selectedNode = useMemo(() => workflow?.nodes.find(n => n.id === selectedNodeId), [workflow, selectedNodeId]);
@@ -342,6 +373,23 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Undo/Redo shortcuts (Ctrl+Z / Ctrl+Y or Ctrl+Shift+Z)
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
+        e.preventDefault();
+        if (currentView === 'EDITOR' && workflow) {
+          undoRedo.undo();
+        }
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
+        e.preventDefault();
+        if (currentView === 'EDITOR' && workflow) {
+          undoRedo.redo();
+        }
+        return;
+      }
+      
+      // Delete/Backspace for nodes and connections
       if ((e.key === 'Delete' || e.key === 'Backspace') && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName || '')) {
         if (selectedNodeId) nodeManagement.deleteNode(selectedNodeId);
         if (selectedConnectionId) connectionManagement.deleteConnection(selectedConnectionId);
@@ -349,7 +397,7 @@ const App: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNodeId, selectedConnectionId, nodeManagement, connectionManagement]);
+  }, [selectedNodeId, selectedConnectionId, nodeManagement, connectionManagement, currentView, workflow, undoRedo]);
 
   // Close replace menu, output quick add menu, model select, and voice select when clicking outside
   useEffect(() => {
@@ -393,16 +441,16 @@ const App: React.FC = () => {
     // Get current node outputs
     const currentNodeOutputs = getNodeOutputs(node);
     
-    // Handle gemini-text special case (dynamic outputs)
+    // Handle text-generation special case (dynamic outputs)
     let newToolOutputs: Port[] = [];
     let newCustomOutputs: any[] | undefined = undefined;
-    if (newToolId === 'gemini-text') {
-      // If replacing with gemini-text, preserve customOutputs if they exist
-      if (node.toolId === 'gemini-text' && node.data.customOutputs) {
+    if (newToolId === 'text-generation') {
+      // If replacing with text-generation, preserve customOutputs if they exist
+      if (node.toolId === 'text-generation' && node.data.customOutputs) {
         newToolOutputs = node.data.customOutputs.map((o: any) => ({ ...o, type: DataType.TEXT }));
         newCustomOutputs = node.data.customOutputs;
       } else {
-        // When replacing another node with gemini-text, create customOutputs based on current node outputs
+        // When replacing another node with text-generation, create customOutputs based on current node outputs
         // This allows replacement of nodes with outputs
         newCustomOutputs = currentNodeOutputs.map((out, idx) => ({
           id: `out-${idx + 1}`,
@@ -415,7 +463,7 @@ const App: React.FC = () => {
       newToolOutputs = newTool.outputs;
     }
     
-    // Check if outputs are compatible (for gemini-text, we've already created matching outputs)
+    // Check if outputs are compatible (for text-generation, we've already created matching outputs)
     if (currentNodeOutputs.length !== newToolOutputs.length) return;
     const isCompatible = currentNodeOutputs.every((out, idx) => {
       if (idx >= newToolOutputs.length) return false;
@@ -443,8 +491,8 @@ const App: React.FC = () => {
           ...node.data,
           // Reset model if the new tool doesn't have models
           model: newTool.models && newTool.models.length > 0 ? (newTool.models[0].id || node.data.model) : undefined,
-          // Preserve customOutputs if replacing with gemini-text and current node has them
-          customOutputs: newToolId === 'gemini-text' ? (newCustomOutputs || node.data.customOutputs) : (newToolId !== 'gemini-text' ? node.data.customOutputs : undefined)
+          // Preserve customOutputs if replacing with text-generation and current node has them
+          customOutputs: newToolId === 'text-generation' ? (newCustomOutputs || node.data.customOutputs) : (newToolId !== 'text-generation' ? node.data.customOutputs : undefined)
         },
         status: NodeStatus.IDLE,
         error: undefined,
@@ -657,7 +705,7 @@ const App: React.FC = () => {
   }, []);
 
   if (currentView === 'DASHBOARD') {
-    return (
+                      return (
       <>
         <Dashboard
           lang={lang}
@@ -677,8 +725,8 @@ const App: React.FC = () => {
           isGenerating={isGeneratingWorkflow}
           onClose={() => {
             modalState.setShowAIGenerateModal(false);
-            setAIWorkflowDescription('');
-          }}
+                    setAIWorkflowDescription('');
+                  }}
           onDescriptionChange={setAIWorkflowDescription}
           onGenerate={() => generateWorkflowWithAI(aiWorkflowDescription)}
         />
@@ -759,6 +807,10 @@ const App: React.FC = () => {
               }} 
         onRun={() => runWorkflow()}
           onToggleSidebar={() => modalState.setSidebarCollapsed(!modalState.sidebarCollapsed)}
+        canUndo={undoRedo.canUndo}
+        canRedo={undoRedo.canRedo}
+        onUndo={undoRedo.undo}
+        onRedo={undoRedo.redo}
         onAddNode={addNode}
           onMouseMove={handleMouseMove} 
           onMouseDown={handleMouseDown}
@@ -823,7 +875,90 @@ const App: React.FC = () => {
         onToggleShowIntermediate={() => setWorkflow(p => p ? ({ ...p, showIntermediateResults: !p.showIntermediateResults }) : null)}
           onExpandOutput={modalState.setExpandedOutput}
         onPinOutputToCanvas={pinOutputToCanvas}
-      />
+        isAIChatOpen={modalState.isAIChatOpen}
+        isAIChatCollapsed={modalState.isAIChatCollapsed}
+        onToggleAIChat={() => {
+          // 如果面板已打开但被折叠，则展开它
+          if (modalState.isAIChatOpen && modalState.isAIChatCollapsed) {
+            modalState.setIsAIChatCollapsed(false);
+          } else {
+            // 否则切换打开/关闭状态
+            const newState = !modalState.isAIChatOpen;
+            modalState.setIsAIChatOpen(newState);
+            // 如果打开，同时展开面板
+            if (newState) {
+              modalState.setIsAIChatCollapsed(false);
+            }
+          }
+        }}
+        onToggleAIChatCollapse={() => modalState.setIsAIChatCollapsed(!modalState.isAIChatCollapsed)}
+        aiChatHistory={aiChatWorkflow.chatHistory}
+        isAIProcessing={aiChatWorkflow.isProcessing}
+        onAISendMessage={aiChatWorkflow.handleUserInput}
+        aiModel={aiChatWorkflow.aiModel}
+        onAIModelChange={aiChatWorkflow.setAiModel}
+        onAIUndo={(messageId) => {
+          // 撤销这次AI对话的所有操作
+          aiChatWorkflow.undoMessageOperations(messageId);
+        }}
+            onAIRetry={(messageId) => {
+              // 重试：找到对应的用户消息并重新发送
+              const history = aiChatWorkflow.chatHistory;
+              const assistantMessageIndex = history.findIndex(m => m.id === messageId);
+              
+              if (assistantMessageIndex >= 0) {
+                // 找到当前 assistant 消息之前最近的一条用户消息
+                let userMessage = null;
+                
+                // 先检查前一条消息是否是用户消息（最常见的情况）
+                if (assistantMessageIndex > 0) {
+                  const prevMessage = history[assistantMessageIndex - 1];
+                  if (prevMessage && prevMessage.role === 'user') {
+                    userMessage = prevMessage;
+                  }
+                }
+                
+                // 如果前一条不是用户消息，向前查找最近的一条用户消息
+                if (!userMessage) {
+                  for (let i = assistantMessageIndex - 1; i >= 0; i--) {
+                    if (history[i].role === 'user') {
+                      userMessage = history[i];
+                      break;
+                    }
+                  }
+                }
+                
+                // 如果找到了用户消息，重新发送
+                if (userMessage) {
+                  aiChatWorkflow.handleUserInput(userMessage.content);
+                }
+              }
+            }}
+            nodeConfigPanelCollapsed={modalState.nodeConfigPanelCollapsed}
+            onToggleNodeConfigPanel={() => modalState.setNodeConfigPanelCollapsed(!modalState.nodeConfigPanelCollapsed)}
+            rightPanelSplitRatio={modalState.rightPanelSplitRatio}
+            onRightPanelResize={(deltaY: number) => {
+              const container = document.querySelector('.flex.flex-col.w-80.border-l');
+              if (container) {
+                const containerHeight = container.clientHeight;
+                const currentRatio = modalState.rightPanelSplitRatio;
+                const deltaRatio = deltaY / containerHeight;
+                const newRatio = Math.max(0.2, Math.min(0.8, currentRatio + deltaRatio));
+                modalState.setRightPanelSplitRatio(newRatio);
+                localStorage.setItem('omniflow_right_panel_split_ratio', newRatio.toString());
+              }
+            }}
+            aiChatPanelPosition={modalState.aiChatPanelPosition}
+            aiChatPanelSize={modalState.aiChatPanelSize}
+            onAiChatPanelPositionChange={(position) => {
+              modalState.setAiChatPanelPosition(position);
+              localStorage.setItem('omniflow_ai_chat_panel_position', JSON.stringify(position));
+            }}
+            onAiChatPanelSizeChange={(size) => {
+              modalState.setAiChatPanelSize(size);
+              localStorage.setItem('omniflow_ai_chat_panel_size', JSON.stringify(size));
+            }}
+          />
 
       <style>{`
         @keyframes marching-ants { from { stroke-dashoffset: 40; } to { stroke-dashoffset: 0; } }

@@ -32,10 +32,13 @@ export const ToolPalette: React.FC<ToolPaletteProps> = ({
       {collapsed && (
         <button
           onClick={onToggleCollapse}
-          className="absolute left-4 top-4 z-40 p-2.5 bg-slate-800/90 hover:bg-indigo-600 border border-slate-700 hover:border-indigo-500 rounded-xl transition-all shadow-lg hover:shadow-indigo-500/20"
+          className="absolute left-4 top-4 z-40 flex items-center gap-2 px-3 py-2.5 bg-slate-800/90 hover:bg-indigo-600 border border-slate-700 hover:border-indigo-500 rounded-xl transition-all shadow-lg hover:shadow-indigo-500/20"
           title={lang === 'zh' ? '展开工具面板' : 'Expand Tool Palette'}
         >
           <Plus size={18} className="text-slate-300 hover:text-white" />
+          <span className="text-sm font-medium text-slate-300 hover:text-white">
+            {lang === 'zh' ? '添加节点' : 'Add Node'}
+          </span>
         </button>
       )}
       <aside

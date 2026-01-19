@@ -12,7 +12,9 @@ import {
   Play,
   Pause,
   RefreshCw,
-  Zap
+  Zap,
+  Undo,
+  Redo
 } from 'lucide-react';
 import { WorkflowState } from '../../../types';
 import { useTranslation, Language } from '../../i18n/useTranslation';
@@ -42,6 +44,10 @@ interface EditorHeaderProps {
   onSave: () => void;
   onPause: () => void;
   onRun: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
 }
 
 export const EditorHeader: React.FC<EditorHeaderProps> = ({
@@ -61,7 +67,11 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
   onClearSnapshot,
   onSave,
   onPause,
-  onRun
+  onRun,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo
 }) => {
   const { t } = useTranslation(lang);
 
@@ -89,6 +99,26 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
         </div>
       </div>
       <div className="flex items-center gap-4">
+        {/* Undo/Redo Controls */}
+        <div className="flex items-center gap-1 bg-slate-800/50 border border-slate-800 rounded-xl p-1">
+          <button
+            onClick={onUndo}
+            disabled={!canUndo}
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            title={lang === 'zh' ? '撤销 (Ctrl+Z)' : 'Undo (Ctrl+Z)'}
+          >
+            <Undo size={14} />
+          </button>
+          <button
+            onClick={onRedo}
+            disabled={!canRedo}
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            title={lang === 'zh' ? '重做 (Ctrl+Y)' : 'Redo (Ctrl+Y)'}
+          >
+            <Redo size={14} />
+          </button>
+        </div>
+        
         {/* Zoom Controls */}
         <div className="flex items-center gap-1 bg-slate-800/50 border border-slate-800 rounded-xl p-1">
           <button

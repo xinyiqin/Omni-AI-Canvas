@@ -19,6 +19,16 @@ export interface Port {
   label: string;
 }
 
+export interface ModelDefaultParams {
+  [key: string]: any; // 模型特定的默认参数
+}
+
+export interface ModelDefinition {
+  id: string;
+  name: string;
+  defaultParams?: ModelDefaultParams; // 该模型的默认参数
+}
+
 export interface ToolDefinition {
   id: string;
   name: string;
@@ -30,7 +40,8 @@ export interface ToolDefinition {
   inputs: Port[];
   outputs: Port[]; // Static outputs
   icon: string;
-  models?: { id: string; name: string }[];
+  models?: ModelDefinition[];
+  defaultParams?: ModelDefaultParams; // 工具级别的默认参数（适用于所有模型）
 }
 
 export interface WorkflowNode {
