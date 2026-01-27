@@ -1,5 +1,5 @@
 
-import { ToolDefinition, DataType } from './types';
+import { ToolDefinition, DataType, ModelDefinition } from './types';
 
 /**
  * Check if an environment variable is set (non-empty)
@@ -11,15 +11,227 @@ import { ToolDefinition, DataType } from './types';
 const hasEnvVar = (key: string): boolean => {
   try {
     // @ts-ignore - process.env is defined by Vite's define config
-    const value = process.env[key];
+    // Vite only replaces static access like process.env.DEEPSEEK_API_KEY
+    // So we need to check each key directly
+    let value: string | undefined;
+    switch (key) {
+      case 'DEEPSEEK_API_KEY':
+        value = process.env.DEEPSEEK_API_KEY;
+        break;
+      case 'GEMINI_API_KEY':
+        value = process.env.GEMINI_API_KEY;
+        break;
+      case 'API_KEY':
+        value = process.env.API_KEY;
+        break;
+      case 'PPCHAT_API_KEY':
+        value = process.env.PPCHAT_API_KEY;
+        break;
+      case 'LIGHTX2V_URL':
+        value = process.env.LIGHTX2V_URL;
+        break;
+      case 'LIGHTX2V_TOKEN':
+        value = process.env.LIGHTX2V_TOKEN;
+        break;
+      case 'LIGHTX2V_CLOUD_URL':
+        value = process.env.LIGHTX2V_CLOUD_URL;
+        break;
+      case 'LIGHTX2V_CLOUD_TOKEN':
+        value = process.env.LIGHTX2V_CLOUD_TOKEN;
+        break;
+      default:
+        // For unknown keys, try dynamic access (may not work with Vite)
+        value = (process.env as any)[key];
+    }
+
     // Check if value exists, is not empty, and is not the string "undefined"
-    return typeof value === 'string' && value.trim() !== '' && value !== 'undefined';
-  } catch {
+    const result = typeof value === 'string' && value.trim() !== '' && value !== 'undefined';
+
+    // Debug log for troubleshooting
+    if (key === 'DEEPSEEK_API_KEY') {
+      console.log('[hasEnvVar] DEEPSEEK_API_KEY check:', {
+        key,
+        valueType: typeof value,
+        valueLength: value?.length || 0,
+        valuePreview: value ? `${value.substring(0, 10)}...` : 'empty',
+        result
+      });
+    }
+
+    if (key === 'LIGHTX2V_CLOUD_TOKEN') {
+      console.log('[hasEnvVar] LIGHTX2V_CLOUD_TOKEN check:', {
+        key,
+        valueType: typeof value,
+        valueLength: value?.length || 0,
+        valuePreview: value ? `${value.substring(0, 10)}...` : 'empty',
+        result
+      });
+    }
+
+    return result;
+  } catch (error) {
+    console.warn(`[hasEnvVar] Error checking ${key}:`, error);
     return false;
   }
 };
 
-import { ModelDefinition } from './types';
+/**
+ * Task type to tool ID mapping
+ */
+const TASK_TO_TOOL_MAP: Record<string, string> = {
+  't2i': 'text-to-image',
+  'i2i': 'image-to-image',
+  't2v': 'video-gen-text',
+  'i2v': 'video-gen-image',
+  'flf2v': 'video-gen-dual-frame',
+  's2v': 'avatar-gen',
+  'animate': 'character-swap'
+};
+
+/**
+ * Get default params for a model based on task type
+ */
+const getDefaultParamsForTask = (task: string): any => {
+  const defaultParamsMap: Record<string, any> = {
+    't2i': { aspectRatio: '1:1' },
+    'i2i': { aspectRatio: '1:1' },
+    't2v': { aspectRatio: '16:9' },
+    'i2v': { aspectRatio: '16:9' },
+    'flf2v': { aspectRatio: '16:9' },
+    's2v': {},
+    'animate': {}
+  };
+  return defaultParamsMap[task] || {};
+};
+
+// 用于防止短时间内多次调用 updateLightX2VModels
+let lastUpdateTime = 0;
+const UPDATE_DEBOUNCE_MS = 1000; // 1秒内的重复调用会被忽略
+
+/**
+ * Update LightX2V models dynamically based on API response
+ * @param models Local models from API
+ * @param cloudModels Optional cloud models from API (will be added with -cloud suffix)
+ */
+export const updateLightX2VModels = (
+  models: Array<{ task: string; model_cls: string; stage: string }>,
+  cloudModels?: Array<{ task: string; model_cls: string; stage: string }>
+) => {
+  // 防抖：如果1秒内被多次调用，只处理最后一次
+  const now = Date.now();
+  if (now - lastUpdateTime < UPDATE_DEBOUNCE_MS) {
+    console.log('[LightX2V] updateLightX2VModels called too frequently, skipping...');
+    return;
+  }
+  lastUpdateTime = now;
+
+  // Group models by task and deduplicate by model_cls
+  const modelsByTask: Record<string, Map<string, { model_cls: string; stage: string; isCloud?: boolean }>> = {};
+
+  // Add local models
+  models.forEach(model => {
+    if (!modelsByTask[model.task]) {
+      modelsByTask[model.task] = new Map();
+    }
+    // Use model_cls as key to deduplicate (case-insensitive)
+    const key = model.model_cls.toLowerCase();
+    if (!modelsByTask[model.task].has(key)) {
+      modelsByTask[model.task].set(key, { model_cls: model.model_cls, stage: model.stage, isCloud: false });
+    }
+  });
+
+  // Add cloud models with -cloud suffix
+  if (cloudModels && cloudModels.length > 0) {
+    cloudModels.forEach(model => {
+      if (!modelsByTask[model.task]) {
+        modelsByTask[model.task] = new Map();
+      }
+      // For cloud models, add -cloud suffix and use as key
+      const cloudModelCls = `${model.model_cls}-cloud`;
+      const key = cloudModelCls.toLowerCase();
+      if (!modelsByTask[model.task].has(key)) {
+        modelsByTask[model.task].set(key, { model_cls: cloudModelCls, stage: model.stage, isCloud: true });
+      }
+    });
+  }
+
+  // Helper function to identify LightX2V models
+  const modelIdLower = (id: string) => id.toLowerCase();
+  const isLightX2VModel = (id: string) => {
+    const lower = modelIdLower(id);
+    return lower.includes('qwen') ||
+           lower.includes('wan') ||
+           lower.includes('sekotalk') ||
+           lower.includes('lightx2v') ||
+           lower.includes('z-image') ||
+           lower.includes('self-forcing') ||
+           lower.includes('matrix-game');
+  };
+
+  // Update each tool's models
+  Object.keys(modelsByTask).forEach(task => {
+    const toolId = TASK_TO_TOOL_MAP[task];
+    if (!toolId) {
+      console.warn(`[LightX2V] Unknown task type: ${task}`);
+      return;
+    }
+
+    const tool = TOOLS.find(t => t.id === toolId);
+    if (!tool) {
+      console.warn(`[LightX2V] Tool not found: ${toolId}`);
+      return;
+    }
+
+    // 完全清除所有 LightX2V 模型，只保留非 LightX2V 模型（如 Gemini）
+    const existingNonLightX2VModels = (tool.models || []).filter(
+      (m: ModelDefinition) => !isLightX2VModel(m.id)
+    );
+
+    // Get unique model_cls values from API response for this task
+    const uniqueModels = Array.from(modelsByTask[task].values());
+
+    // Create LightX2V models from API response (deduplicated by model_cls, case-insensitive)
+    const modelMap = new Map<string, ModelDefinition>();
+    uniqueModels.forEach(model => {
+      const modelId = model.model_cls;
+      const key = modelId.toLowerCase();
+      // Only add if not already in map
+      if (!modelMap.has(key)) {
+        const displayName = model.isCloud
+          ? `LightX2V Cloud (${model.model_cls.replace(/-cloud$/, '')})`
+          : `LightX2V (${modelId})`;
+        modelMap.set(key, {
+          id: modelId, // 保持原始大小写（包括 -cloud 后缀）
+          name: displayName,
+          defaultParams: getDefaultParamsForTask(task)
+        });
+      }
+    });
+    const lightX2VModels: ModelDefinition[] = Array.from(modelMap.values());
+
+    // Combine models: LightX2V models first, then non-LightX2V models
+    // Use Map to ensure no duplicates (case-insensitive)
+    const finalModelMap = new Map<string, ModelDefinition>();
+
+    // Add LightX2V models first
+    lightX2VModels.forEach(model => {
+      finalModelMap.set(model.id.toLowerCase(), model);
+    });
+
+    // Add non-LightX2V models (only if not already present)
+    existingNonLightX2VModels.forEach(model => {
+      const key = model.id.toLowerCase();
+      if (!finalModelMap.has(key)) {
+        finalModelMap.set(key, model);
+      }
+    });
+
+    // Update tool models
+    tool.models = getFilteredModels(Array.from(finalModelMap.values()));
+
+    console.log(`[LightX2V] Updated models for ${toolId}:`, tool.models.map((m: ModelDefinition) => m.id));
+  });
+};
 
 /**
  * Get the filtered models based on available API keys
@@ -32,11 +244,13 @@ const getFilteredModels = (models: ModelDefinition[]): ModelDefinition[] => {
       'gemini-3-flash-preview': ['GEMINI_API_KEY', 'API_KEY'],
       'gemini-2.5-flash-image': ['GEMINI_API_KEY', 'API_KEY'],
       'gemini-2.5-flash-preview-tts': ['GEMINI_API_KEY', 'API_KEY'],
+      'doubao-seed-1-6-vision-250815': ['DEEPSEEK_API_KEY'],
       'deepseek-v3-2-251201': ['DEEPSEEK_API_KEY'],
       'doubao-1-5-vision-pro-32k-250115': ['DEEPSEEK_API_KEY'],
       'ppchat-gemini-2.5-pro': ['PPCHAT_API_KEY'],
       'ppchat-gemini-3-pro-preview': ['PPCHAT_API_KEY'],
-      'lightx2v': ['LIGHTX2V_TOKEN'],
+      'ppchat-gemini-2.5-flash': ['PPCHAT_API_KEY'],
+      'lightx2v': ['LIGHTX2V_TOKEN', 'LIGHTX2V_CLOUD_TOKEN'],
     };
 
     const requiredEnvVars = modelEnvMap[model.id];
@@ -52,7 +266,7 @@ const getFilteredModels = (models: ModelDefinition[]): ModelDefinition[] => {
 
 export const TOOLS: ToolDefinition[] = [
   {
-    id: 'text-prompt',
+    id: 'text-input',
     name: 'Text Input',
     name_zh: '文本输入',
     category: 'Input',
@@ -118,48 +332,48 @@ export const TOOLS: ToolDefinition[] = [
       customOutputs: [{ id: 'out-text', label: '执行结果', description: 'Main text response.' }]
     },
     models: getFilteredModels([
-      { 
-        id: 'deepseek-v3-2-251201', 
+      {
+        id: 'deepseek-v3-2-251201',
         name: 'DeepSeek V3.2',
         defaultParams: {
           mode: 'basic',
           customOutputs: [{ id: 'out-text', label: '执行结果', description: 'Main text response.' }]
         }
       },
-      { 
-        id: 'doubao-seed-1-6-vision-250815', 
+      {
+        id: 'doubao-seed-1-6-vision-250815',
         name: 'Doubao Seed 1.6',
         defaultParams: {
           mode: 'basic',
           customOutputs: [{ id: 'out-text', label: '执行结果', description: 'Main text response.' }]
         }
       },
-      { 
-        id: 'ppchat-gemini-2.5-flash', 
+      {
+        id: 'ppchat-gemini-2.5-flash',
         name: 'Gemini 2.5 Flash',
         defaultParams: {
           mode: 'basic',
           customOutputs: [{ id: 'out-text', label: '执行结果', description: 'Main text response.' }]
         }
       },
-      { 
-        id: 'ppchat-gemini-3-pro-preview', 
+      {
+        id: 'ppchat-gemini-3-pro-preview',
         name: 'Gemini 3 Pro',
         defaultParams: {
           mode: 'basic',
           customOutputs: [{ id: 'out-text', label: '执行结果', description: 'Main text response.' }]
         }
       },
-      { 
-        id: 'gemini-3-pro-preview', 
+      {
+        id: 'gemini-3-pro-preview',
         name: 'Gemini 3 Pro',
         defaultParams: {
           mode: 'basic',
           customOutputs: [{ id: 'out-text', label: '执行结果', description: 'Main text response.' }]
         }
       },
-      { 
-        id: 'gemini-3-flash-preview', 
+      {
+        id: 'gemini-3-flash-preview',
         name: 'Gemini 3 Flash',
         defaultParams: {
           mode: 'basic',
@@ -183,20 +397,14 @@ export const TOOLS: ToolDefinition[] = [
       aspectRatio: '1:1'
     },
     models: getFilteredModels([
-      { 
-        id: 'Qwen-Image-2512', 
-        name: 'LightX2V (Qwen Image 2.5)',
-        defaultParams: {
-          aspectRatio: '1:1'
-        }
-      },
-      { 
-        id: 'gemini-2.5-flash-image', 
+      {
+        id: 'gemini-2.5-flash-image',
         name: 'Gemini (Flash Image)',
         defaultParams: {
           aspectRatio: '1:1'
         }
       }
+      // LightX2V models will be added dynamically via updateLightX2VModels
     ])
   },
   {
@@ -217,20 +425,14 @@ export const TOOLS: ToolDefinition[] = [
       aspectRatio: '1:1'
     },
     models: getFilteredModels([
-      { 
-        id: 'Qwen-Image-Edit-2511', 
-        name: 'LightX2V (Qwen Image Edit 2511)',
-        defaultParams: {
-          aspectRatio: '1:1'
-        }
-      },
-      { 
-        id: 'gemini-2.5-flash-image', 
+      {
+        id: 'gemini-2.5-flash-image',
         name: 'Gemini (Flash Image)',
         defaultParams: {
           aspectRatio: '1:1'
         }
       }
+      // LightX2V models will be added dynamically via updateLightX2VModels
     ])
   },
   {
@@ -251,8 +453,8 @@ export const TOOLS: ToolDefinition[] = [
       model: 'lightx2v'
     },
     models: getFilteredModels([
-      { 
-        id: 'lightx2v', 
+      {
+        id: 'lightx2v',
         name: 'LightX2V TTS',
         defaultParams: {
           voiceType: 'zh_female_vv_uranus_bigtts',
@@ -260,11 +462,11 @@ export const TOOLS: ToolDefinition[] = [
           speechRate: 0,
           pitch: 0,
           loudnessRate: 0,
-          resourceId: ''
+          resourceId: 'seed-tts-2.0'
         }
       },
-      { 
-        id: 'gemini-2.5-flash-preview-tts', 
+      {
+        id: 'gemini-2.5-flash-preview-tts',
         name: 'Gemini 2.5 TTS',
         defaultParams: {
           voice: 'Kore'
@@ -309,13 +511,7 @@ export const TOOLS: ToolDefinition[] = [
       aspectRatio: '16:9'
     },
     models: [
-      { 
-        id: 'Wan2.2_T2V_A14B_distilled', 
-        name: 'Wan 2.2 T2V',
-        defaultParams: {
-          aspectRatio: '16:9'
-        }
-      }
+      // LightX2V models will be added dynamically via updateLightX2VModels
     ]
   },
   {
@@ -336,13 +532,7 @@ export const TOOLS: ToolDefinition[] = [
       aspectRatio: '16:9'
     },
     models: [
-      { 
-        id: 'Wan2.2_I2V_A14B_distilled', 
-        name: 'Wan 2.2 I2V',
-        defaultParams: {
-          aspectRatio: '16:9'
-        }
-      }
+      // LightX2V models will be added dynamically via updateLightX2VModels
     ]
   },
   {
@@ -364,13 +554,7 @@ export const TOOLS: ToolDefinition[] = [
       aspectRatio: '16:9'
     },
     models: [
-      { 
-        id: 'Wan2.2_I2V_A14B_distilled', 
-        name: 'Wan 2.2 I2V',
-        defaultParams: {
-          aspectRatio: '16:9'
-        }
-      }
+      // LightX2V models will be added dynamically via updateLightX2VModels
     ]
   },
   {
@@ -389,7 +573,7 @@ export const TOOLS: ToolDefinition[] = [
     outputs: [{ id: 'out-video', type: DataType.VIDEO, label: 'Avatar Video' }],
     icon: 'UserCircle',
     models: [
-      { id: 'SekoTalk', name: 'SekoTalk' }
+      // LightX2V models will be added dynamically via updateLightX2VModels
     ]
   },
   {
@@ -408,8 +592,8 @@ export const TOOLS: ToolDefinition[] = [
     outputs: [{ id: 'out-video', type: DataType.VIDEO, label: 'Swapped Video' }],
     icon: 'UserCog',
     models: [
-      { id: 'wan2.2_animate', name: 'Wan 2.2 Animate' },
       { id: 'veo-3.1-fast-generate-preview', name: 'Veo 3.1 Fast' }
+      // LightX2V models will be added dynamically via updateLightX2VModels
     ]
   },
   {

@@ -11,7 +11,6 @@ import {
   Upload,
   Volume2,
   Video as VideoIcon,
-  Edit3,
   Maximize2,
   Play,
   ChevronDown,
@@ -24,6 +23,12 @@ import { useTranslation, Language } from '../../i18n/useTranslation';
 import { getIcon } from '../../utils/icons';
 import { formatTime } from '../../utils/format';
 import { screenToWorld, ViewState } from '../../utils/canvas';
+import { getAssetPath } from '../../utils/assetPath';
+import { uploadNodeInputFile } from '../../utils/workflowFileManager';
+import { TextNodePreview } from '../previews/TextNodePreview';
+import { ImageNodePreview } from '../previews/ImageNodePreview';
+import { AudioNodePreview } from '../previews/AudioNodePreview';
+import { VideoNodePreview } from '../previews/VideoNodePreview';
 
 interface NodeProps {
   node: WorkflowNode;
@@ -57,6 +62,7 @@ interface NodeProps {
   onSetVoiceSelect: (nodeId: string | null) => void;
   onSetExpandedOutput: (value: { nodeId: string; fieldId?: string } | null) => void;
   onSetShowAudioEditor: (nodeId: string | null) => void;
+  onSetShowVideoEditor: (nodeId: string | null) => void;
   onSetConnecting: (value: {
     nodeId: string;
     portId: string;
@@ -119,6 +125,7 @@ export const Node: React.FC<NodeProps> = ({
   onSetVoiceSelect,
   onSetExpandedOutput,
   onSetShowAudioEditor,
+  onSetShowVideoEditor,
   onSetConnecting,
   onAddConnection,
   onClearSelectedRunId,
@@ -132,6 +139,9 @@ export const Node: React.FC<NodeProps> = ({
   const { t } = useTranslation(lang);
   const nodeRef = useRef<HTMLDivElement>(null);
   const lastHeightRef = useRef<number>(0);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   const tool = TOOLS.find((t) => t.id === node.toolId);
   if (!tool) return null;
@@ -148,8 +158,39 @@ export const Node: React.FC<NodeProps> = ({
       }
     }
   }, [node.id, onNodeHeightChange, node.data, outputs.length, activeOutputs[node.id], node.status]);
-  const nodeResult = sourceOutputs[node.id] || (tool.category === 'Input' ? node.data.value : null);
+  const nodeResultRaw = sourceOutputs[node.id] || (tool.category === 'Input' ? node.data.value : null);
+  // Extract actual value from reference objects (for history outputs or saved outputs)
+  const nodeResult = nodeResultRaw && typeof nodeResultRaw === 'object' && !Array.isArray(nodeResultRaw) && nodeResultRaw.type === 'url'
+    ? nodeResultRaw.data  // Extract URL from { type: 'url', data: '...' }
+    : nodeResultRaw && typeof nodeResultRaw === 'object' && !Array.isArray(nodeResultRaw) && nodeResultRaw.type === 'text'
+    ? nodeResultRaw.data  // Extract text from { type: 'text', data: '...' }
+    : nodeResultRaw;  // Use as-is for strings, arrays, or other types
   const firstOutputType = outputs[0]?.type || DataType.TEXT;
+  const resolveMediaSrc = (value?: string) => {
+    if (!value) return '';
+    if (value.startsWith('data:') || value.startsWith('http') || value.startsWith('/api/')) return value;
+    return getAssetPath(value);
+  };
+
+  const rawImageValues = Array.isArray(node.data.value) ? node.data.value : [];
+  const imageEdits = Array.isArray(node.data.imageEdits) ? node.data.imageEdits : [];
+  const imageEntries = rawImageValues.map((value: string, index: number) => {
+    const display = resolveMediaSrc(value);
+    const existing = imageEdits[index];
+    if (existing && existing.source === value) {
+      return {
+        ...existing,
+        original: display,
+        cropped: existing.cropped || display
+      };
+    }
+    return {
+      source: value,
+      original: display,
+      cropped: display,
+      cropBox: { x: 10, y: 10, w: 80, h: 80 }
+    };
+  });
 
   const durationText =
     node.status === NodeStatus.RUNNING
@@ -160,7 +201,7 @@ export const Node: React.FC<NodeProps> = ({
   const hasData =
     (isInputNode && node.data.value && (Array.isArray(node.data.value) ? node.data.value.length > 0 : true)) ||
     (!isInputNode && sourceOutputs[node.id]);
-  const shouldShowPreview = hasData && node.toolId !== 'text-prompt';
+  const shouldShowPreview = hasData && !isInputNode && node.toolId !== 'text-input';
 
   const handleNodeClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -186,8 +227,9 @@ export const Node: React.FC<NodeProps> = ({
 
   const handlePortMouseDown = (port: Port, direction: 'in' | 'out') => (e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     if (direction === 'out') {
+      const nodeWidth = isInputNode ? 320 : 224;
       // For output ports, calculate position from node bottom (same as Connection component)
       const outputPortIndex = outputs.findIndex((p) => p.id === port.id);
       const nodeBottomY = node.y + nodeHeight;
@@ -242,38 +284,198 @@ export const Node: React.FC<NodeProps> = ({
     }
   };
 
+  const [isUploading, setIsUploading] = React.useState(false);
+  const outputPortId = outputs[0]?.id;
+  const isWorkflowReady = (id?: string) => {
+    if (!id) return false;
+    return id.startsWith('workflow-') ||
+      id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  };
+
+  const dataUrlToFile = (dataUrl: string, namePrefix: string) => {
+    const arr = dataUrl.split(',');
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+    const extMap: Record<string, string> = {
+      'image/png': '.png',
+      'image/jpeg': '.jpg',
+      'image/jpg': '.jpg',
+      'image/webp': '.webp',
+      'image/gif': '.gif',
+      'audio/wav': '.wav',
+      'audio/mpeg': '.mp3',
+      'audio/ogg': '.ogg',
+      'video/webm': '.webm',
+      'video/mp4': '.mp4'
+    };
+    const ext = extMap[mimeType] || '.bin';
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], `${namePrefix}-${Date.now()}${ext}`, { type: mimeType });
+  };
+
+  const persistDataUrl = async (dataUrl: string, namePrefix: string) => {
+    if (!outputPortId || !isWorkflowReady(workflow.id)) return dataUrl;
+    try {
+      const file = dataUrlToFile(dataUrl, namePrefix);
+      const result = await uploadNodeInputFile(workflow.id!, node.id, outputPortId, file);
+      return result?.file_url || dataUrl;
+    } catch (err) {
+      console.error('[Node] Failed to persist data URL:', err);
+      return dataUrl;
+    }
+  };
+
+  React.useEffect(() => {
+    if (node.toolId !== 'image-input') return;
+    const values = Array.isArray(node.data.value) ? node.data.value : [];
+    const edits = Array.isArray(node.data.imageEdits) ? node.data.imageEdits : [];
+    const needsSync = values.length !== edits.length || edits.some((entry: any, idx: number) => entry?.source !== values[idx]);
+    if (!needsSync) return;
+    const nextEdits = values.map((value: string, index: number) => {
+      const display = resolveMediaSrc(value);
+      const existing = edits[index];
+      if (existing && existing.source === value) {
+        return {
+          ...existing,
+          original: display,
+          cropped: existing.cropped || display
+        };
+      }
+      return {
+        source: value,
+        original: display,
+        cropped: display,
+        cropBox: { x: 10, y: 10, w: 80, h: 80 }
+      };
+    });
+    onUpdateNodeData(node.id, 'imageEdits', nextEdits);
+  }, [node.id, node.toolId, node.data.value, node.data.imageEdits]);
+
+  React.useEffect(() => {
+    if (!isWorkflowReady(workflow.id)) return;
+    if (node.toolId === 'audio-input' && typeof node.data.value === 'string' && node.data.value.startsWith('data:')) {
+      persistDataUrl(node.data.value, 'audio-input').then((url) => {
+        if (url !== node.data.value) {
+          onUpdateNodeData(node.id, 'value', url);
+        }
+      });
+    }
+    if (node.toolId === 'image-input' && Array.isArray(node.data.value) && node.data.value.some((v: string) => v.startsWith('data:'))) {
+      const values = node.data.value as string[];
+      const edits = Array.isArray(node.data.imageEdits) ? node.data.imageEdits : [];
+      const persist = async () => {
+        const updatedValues = await Promise.all(values.map((val, idx) => {
+          if (val.startsWith('data:')) {
+            return persistDataUrl(val, `image-input-${idx}`);
+          }
+          return val;
+        }));
+        if (updatedValues.some((val, idx) => val !== values[idx])) {
+          const updatedEdits = updatedValues.map((val, idx) => {
+            const display = resolveMediaSrc(val);
+            const existing = edits[idx];
+            return {
+              ...(existing || { cropBox: { x: 10, y: 10, w: 80, h: 80 } }),
+              source: val,
+              original: existing?.original || display,
+              cropped: val
+            };
+          });
+          onUpdateNodeData(node.id, 'imageEdits', updatedEdits);
+          onUpdateNodeData(node.id, 'value', updatedValues);
+        }
+      };
+      persist();
+    }
+    if (node.toolId === 'video-input' && typeof node.data.value === 'string' && node.data.value.startsWith('data:')) {
+      persistDataUrl(node.data.value, 'video-input').then((url) => {
+        if (url !== node.data.value) {
+          onUpdateNodeData(node.id, 'value', url);
+        }
+      });
+    }
+  }, [workflow.id, node.id, node.toolId, node.data.value]);
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, isMultiple: boolean = false) => {
     const files = Array.from(e.target.files || []);
-    if (isMultiple) {
-      const base64s = await Promise.all(
-        files.map(
-          (file: File) =>
-            new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result as string);
-              reader.readAsDataURL(file);
-            })
-        )
-      );
-      onUpdateNodeData(node.id, 'value', [...(node.data.value || []), ...base64s]);
-    } else {
-      const file = files[0] as File;
-      if (file) {
-        const base64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(file);
-        });
-        onUpdateNodeData(node.id, 'value', base64);
+    if (files.length === 0) return;
+
+    // 需要 workflow.id 才能上传
+    if (!isWorkflowReady(workflow.id)) {
+      console.error('[Node] Cannot upload file: workflow ID is not available');
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const tool = TOOLS.find(t => t.id === node.toolId);
+      if (!tool || tool.category !== 'Input') {
+        console.error('[Node] Cannot upload file: node is not an input node');
+        return;
       }
+
+      const outputPort = tool.outputs[0];
+      if (!outputPort) {
+        console.error('[Node] Cannot upload file: output port not found');
+        return;
+      }
+
+      // 上传所有文件
+      const uploadPromises = files.map((file: File) =>
+        uploadNodeInputFile(workflow.id!, node.id, outputPort.id, file)
+          .then(result => {
+            if (result) {
+              return result.file_url;
+            }
+            return null;
+          })
+          .catch(err => {
+            console.error(`[Node] Error uploading file:`, err);
+            return null;
+          })
+      );
+
+      const fileUrls = await Promise.all(uploadPromises);
+      const validUrls = fileUrls.filter((url: string | null) => url !== null);
+
+      if (validUrls.length > 0) {
+        // 更新 node.data.value，始终使用数组格式
+        const currentValue = node.data.value || [];
+        const existingUrls = Array.isArray(currentValue) ? currentValue : [currentValue].filter(Boolean);
+        const newValue = isMultiple ? [...existingUrls, ...validUrls] : validUrls[0];
+        onUpdateNodeData(node.id, 'value', newValue);
+        if (node.toolId === 'audio-input' && newValue) {
+          onUpdateNodeData(node.id, 'audioOriginal', newValue);
+          onUpdateNodeData(node.id, 'audioRange', { start: 0, end: 100 });
+        }
+        if (node.toolId === 'video-input') {
+          onUpdateNodeData(node.id, 'trimStart', 0);
+          onUpdateNodeData(node.id, 'trimEnd', undefined);
+        }
+      }
+    } catch (err) {
+      console.error('[Node] Error uploading files:', err);
+    } finally {
+      setIsUploading(false);
     }
   };
 
   return (
     <div
       ref={nodeRef}
-      className={`node-element absolute w-56 bg-slate-900 border rounded-3xl shadow-2xl transition-all z-10 group ${
-        isSelected ? 'border-indigo-500 ring-8 ring-indigo-500/10' : 'border-slate-800'
+      className={`node-element absolute bg-slate-900 border transition-all z-10 group ${
+        isInputNode
+          ? 'w-80 rounded-[2.5rem] shadow-2xl'
+          : 'w-56 rounded-3xl shadow-2xl'
+      } ${isSelected
+        ? 'border-[#90dce1] ring-8 ring-#90dce1/10 shadow-[0_0_40px_-10px_rgba(144,220,225,0.35)]'
+        : 'border-slate-800/80 hover:border-[#90dce1]/60 hover:shadow-[0_0_30px_-10px_rgba(144,220,225,0.2)]'
       }`}
       style={{ left: node.x, top: node.y }}
       onClick={handleNodeClick}
@@ -289,7 +491,7 @@ export const Node: React.FC<NodeProps> = ({
                 e.stopPropagation();
                 onSetReplaceMenu(showReplaceMenu === node.id ? null : node.id);
               }}
-              className="p-2 bg-indigo-500 text-white rounded-full shadow-lg hover:bg-indigo-600 transition-all active:scale-90"
+              className="p-2 bg-[#90dce1] text-white rounded-full shadow-lg hover:bg-[#90dce1] transition-all active:scale-90"
               title={lang === 'zh' ? '替换节点' : 'Replace Node'}
             >
               <RefreshCw size={16} />
@@ -304,7 +506,7 @@ export const Node: React.FC<NodeProps> = ({
                         e.stopPropagation();
                         onReplaceNode(node.id, replaceTool.id);
                       }}
-                      className="w-full px-4 py-2 text-left text-xs text-slate-300 hover:bg-indigo-500/20 hover:text-white transition-colors flex items-center gap-2"
+                      className="w-full px-4 py-2 text-left text-xs text-slate-300 hover:bg-[#90dce1]/20 hover:text-white transition-colors flex items-center gap-2"
                     >
                       <div className="p-1 rounded bg-slate-700">
                         {React.createElement(getIcon(replaceTool.icon), { size: 12 })}
@@ -337,13 +539,13 @@ export const Node: React.FC<NodeProps> = ({
       {/* Node Header */}
       <div
         className={`px-4 py-3 border-b flex items-center justify-between bg-slate-800/40 rounded-t-3xl ${
-          node.status === NodeStatus.RUNNING ? 'animate-pulse bg-indigo-500/10 border-indigo-500/20' : ''
+          node.status === NodeStatus.RUNNING ? 'animate-pulse bg-[#90dce1]/10 border-[#90dce1]/20' : ''
         }`}
       >
         <div className="flex items-center gap-2 truncate flex-1 min-w-0">
           <div
             className={`p-1.5 rounded-lg shrink-0 ${
-              node.status === NodeStatus.RUNNING ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'
+              node.status === NodeStatus.RUNNING ? 'bg-[#90dce1] text-white' : 'bg-slate-800 text-slate-400'
             }`}
           >
             {React.createElement(getIcon(tool.icon), { size: 10 })}
@@ -353,10 +555,27 @@ export const Node: React.FC<NodeProps> = ({
           </span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          {(node.toolId === 'audio-input' || node.toolId === 'video-input') && (
+            <button
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (node.toolId === 'audio-input') {
+                  onSetShowAudioEditor(node.id);
+                } else {
+                  onSetShowVideoEditor(node.id);
+                }
+              }}
+              className="p-1.5 rounded-lg bg-slate-900/70 border border-slate-800 text-slate-400 hover:text-[#90dce1] hover:border-[#90dce1]/60 transition-all"
+              title={lang === 'zh' ? '放大编辑' : 'Expand'}
+            >
+              <Maximize2 size={12} />
+            </button>
+          )}
           {(node.status === NodeStatus.RUNNING || node.executionTime !== undefined) && (
             <span
               className={`text-[8px] font-bold ${
-                node.status === NodeStatus.RUNNING ? 'text-indigo-400' : 'text-slate-500'
+                node.status === NodeStatus.RUNNING ? 'text-[#90dce1]' : 'text-slate-500'
               }`}
             >
               {durationText}
@@ -371,7 +590,7 @@ export const Node: React.FC<NodeProps> = ({
                   e.stopPropagation();
                   onRunWorkflow(node.id, true);
                 }}
-                className="p-1 text-slate-400 hover:text-indigo-400 transition-colors"
+                className="p-1 text-slate-400 hover:text-[#90dce1] transition-colors"
               >
                 <PlayIcon size={12} />
               </button>
@@ -398,88 +617,210 @@ export const Node: React.FC<NodeProps> = ({
         {/* Input Node Content */}
         {isInputNode && (
           <div onMouseDown={(e) => e.stopPropagation()} className="space-y-3">
-            {node.toolId === 'text-prompt' && (
-              <textarea
+            {node.toolId === 'text-input' && (
+              <TextNodePreview
                 value={node.data.value || ''}
-                onChange={(e) => onUpdateNodeData(node.id, 'value', e.target.value)}
-                className="w-full h-24 bg-slate-950/50 border border-slate-800 rounded-xl p-2 text-[10px] resize-none focus:ring-1 focus:ring-indigo-500 transition-all text-slate-300 custom-scrollbar"
-                placeholder="Type here..."
+                onChange={(value) => onUpdateNodeData(node.id, 'value', value)}
               />
             )}
             {node.toolId === 'image-input' && (
               <div className="space-y-2">
-                <div className="flex flex-wrap gap-1.5">
-                  {(node.data.value || []).map((img: string, i: number) => (
-                    <div key={i} className="relative w-8 h-8 group/img">
-                      <img src={img} className="w-full h-full object-cover rounded border border-slate-700" alt={`Image ${i + 1}`} />
-                      <button
-                        onClick={() => {
-                          const next = node.data.value.filter((_: any, idx: number) => idx !== i);
-                          onUpdateNodeData(node.id, 'value', next);
-                        }}
-                        className="absolute -top-1 -right-1 p-0.5 bg-red-500 rounded-full opacity-0 group-hover/img:opacity-100 transition-opacity"
-                      >
-                        <X size={6} />
-                      </button>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleFileUpload(e, true)}
+                />
+                {imageEntries.length === 0 ? (
+                  <label
+                    onClick={() => imageInputRef.current?.click()}
+                    className="flex flex-col items-center justify-center w-full py-10 border-2 border-dashed border-slate-800 rounded-[2rem] cursor-pointer hover:bg-slate-800/40 hover:border-[#90dce1]/40 transition-all group"
+                  >
+                    <div className="p-3 rounded-2xl bg-slate-900 group-hover:bg-[#90dce1]/10 transition-colors mb-3">
+                      <Upload size={24} className="text-slate-600 group-hover:text-[#90dce1] transition-colors" />
                     </div>
-                  ))}
-                  <label className="w-8 h-8 flex items-center justify-center border border-dashed border-slate-700 rounded cursor-pointer hover:border-indigo-500 transition-colors">
-                    <Plus size={10} className="text-slate-500" />
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => handleFileUpload(e, true)}
-                    />
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest group-hover:text-slate-200">
+                      {lang === 'zh' ? '点击上传图片' : 'Upload Images'}
+                    </span>
                   </label>
-                </div>
+                ) : (
+                  <div className="relative group/content-container">
+                    <button
+                      onClick={() => {
+                        onUpdateNodeData(node.id, 'value', []);
+                        onUpdateNodeData(node.id, 'imageEdits', []);
+                      }}
+                      className="absolute -top-3 -right-3 p-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-2xl z-20 opacity-0 group-hover/content-container:opacity-100 transition-all scale-90 group-hover/content-container:scale-100 active:scale-90"
+                    >
+                      <X size={12} />
+                    </button>
+                    <ImageNodePreview
+                      images={imageEntries}
+                      onAddMore={() => imageInputRef.current?.click()}
+                      onUpdate={(nextImages) => {
+                        onUpdateNodeData(node.id, 'imageEdits', nextImages);
+                        const nextValues = nextImages.map((entry: any) =>
+                          entry.cropped && entry.cropped !== entry.original ? entry.cropped : entry.source
+                        );
+                        onUpdateNodeData(node.id, 'value', nextValues);
+                        if (isWorkflowReady(workflow.id) && outputPortId) {
+                          const persist = async () => {
+                            const updatedImages = await Promise.all(nextImages.map(async (entry: any, idx: number) => {
+                              if (typeof entry.cropped === 'string' && entry.cropped.startsWith('data:')) {
+                                const url = await persistDataUrl(entry.cropped, `image-input-${idx}`);
+                                return {
+                                  ...entry,
+                                  source: url,
+                                  cropped: url
+                                };
+                              }
+                              return entry;
+                            }));
+                            const updatedValues = updatedImages.map((entry: any) => entry.cropped || entry.source);
+                            onUpdateNodeData(node.id, 'imageEdits', updatedImages);
+                            onUpdateNodeData(node.id, 'value', updatedValues);
+                          };
+                          persist();
+                        }
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             )}
             {(node.toolId === 'audio-input' || node.toolId === 'video-input') && (
               <div className="space-y-2">
-                {node.data.value ? (
-                  <div className="flex items-center justify-between p-2 bg-slate-950/50 rounded-xl border border-slate-800">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      {node.toolId === 'audio-input' ? (
-                        <Volume2 size={12} className="text-indigo-400 shrink-0" />
-                      ) : (
-                        <VideoIcon size={12} className="text-indigo-400 shrink-0" />
-                      )}
-                      <span className="text-[8px] text-slate-400 truncate">Media File</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {node.toolId === 'audio-input' && (
-                        <button
-                          onClick={() => onSetShowAudioEditor(node.id)}
-                          className="p-1 text-slate-600 hover:text-indigo-400 transition-colors"
-                          title={lang === 'zh' ? '编辑音频' : 'Edit Audio'}
+                {(() => {
+                  const mediaValue = Array.isArray(node.data.value) ? node.data.value[0] : node.data.value;
+                  const hasMedia = !!mediaValue;
+                  if (!hasMedia) {
+                    return (
+                      <>
+                        <input
+                          ref={node.toolId === 'audio-input' ? audioInputRef : videoInputRef}
+                          type="file"
+                          accept={node.toolId === 'audio-input' ? 'audio/*' : 'video/*'}
+                          className="hidden"
+                          disabled={isUploading}
+                          onChange={(e) => handleFileUpload(e, false)}
+                        />
+                        <label
+                          onClick={() => (node.toolId === 'audio-input' ? audioInputRef.current : videoInputRef.current)?.click()}
+                          className="flex flex-col items-center justify-center w-full py-10 border-2 border-dashed border-slate-800 rounded-[2rem] cursor-pointer hover:bg-slate-800/40 hover:border-[#90dce1]/40 transition-all group"
                         >
-                          <Edit3 size={10} />
-                        </button>
-                      )}
+                          {isUploading ? (
+                            <>
+                              <RefreshCw size={24} className="text-[#90dce1] animate-spin mb-3" />
+                              <span className="text-[10px] font-black text-[#90dce1] uppercase tracking-widest">
+                                {lang === 'zh' ? '上传中...' : 'Uploading...'}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="p-3 rounded-2xl bg-slate-900 group-hover:bg-[#90dce1]/10 transition-colors mb-3">
+                                <Upload size={24} className="text-slate-600 group-hover:text-[#90dce1] transition-colors" />
+                              </div>
+                              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest group-hover:text-slate-200">
+                                {lang === 'zh'
+                                  ? `点击上传${node.toolId === 'audio-input' ? '音频' : '视频'}`
+                                  : `Upload ${node.toolId === 'audio-input' ? 'Audio' : 'Video'}`}
+                              </span>
+                            </>
+                          )}
+                        </label>
+                      </>
+                    );
+                  }
+
+                  return (
+                    <div className="relative group/content-container">
                       <button
-                        onClick={() => onUpdateNodeData(node.id, 'value', null)}
-                        className="p-1 text-slate-600 hover:text-red-400"
+                        onClick={() => {
+                          onUpdateNodeData(node.id, 'value', null);
+                          if (node.toolId === 'audio-input') {
+                            onUpdateNodeData(node.id, 'audioOriginal', null);
+                            onUpdateNodeData(node.id, 'audioRange', null);
+                          }
+                          if (node.toolId === 'video-input') {
+                            onUpdateNodeData(node.id, 'trimStart', null);
+                            onUpdateNodeData(node.id, 'trimEnd', null);
+                          }
+                        }}
+                        className="absolute -top-3 -right-3 p-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-2xl z-20 opacity-0 group-hover/content-container:opacity-100 transition-all scale-90 group-hover/content-container:scale-100 active:scale-90"
                       >
-                        <X size={10} />
+                        <X size={12} />
                       </button>
+                      {node.toolId === 'audio-input' ? (
+                        <>
+                        <AudioNodePreview
+                          audioData={{
+                            original: node.data.audioOriginal || resolveMediaSrc(mediaValue),
+                            trimmed: mediaValue,
+                            range: node.data.audioRange || { start: 0, end: 100 }
+                          }}
+                          onUpdate={(trimmed, range) => {
+                            if (!node.data.audioOriginal) {
+                              onUpdateNodeData(node.id, 'audioOriginal', mediaValue);
+                            }
+                            onUpdateNodeData(node.id, 'audioRange', range);
+                            onUpdateNodeData(node.id, 'value', trimmed);
+                            if (typeof trimmed === 'string' && trimmed.startsWith('data:') && isWorkflowReady(workflow.id)) {
+                              persistDataUrl(trimmed, 'audio-input-trim').then((url) => {
+                                if (url !== trimmed) {
+                                  onUpdateNodeData(node.id, 'value', url);
+                                }
+                              });
+                            }
+                            if (typeof node.data.audioOriginal === 'string' && node.data.audioOriginal.startsWith('data:') && isWorkflowReady(workflow.id)) {
+                              persistDataUrl(node.data.audioOriginal, 'audio-input-original').then((url) => {
+                                if (url !== node.data.audioOriginal) {
+                                  onUpdateNodeData(node.id, 'audioOriginal', url);
+                                }
+                              });
+                            }
+                          }}
+                        />
+                        </>
+                      ) : (
+                        <VideoNodePreview
+                          videoUrl={resolveMediaSrc(node.data.videoOriginal || mediaValue)}
+                          initialStart={node.data.trimStart}
+                          initialEnd={node.data.trimEnd}
+                          onRangeChange={(start, end) => {
+                            onUpdateNodeData(node.id, 'trimStart', start);
+                            onUpdateNodeData(node.id, 'trimEnd', end);
+                          }}
+                          onUpdate={(start, end, trimmedUrl) => {
+                            onUpdateNodeData(node.id, 'trimStart', start);
+                            onUpdateNodeData(node.id, 'trimEnd', end);
+                            if (!node.data.videoOriginal) {
+                              onUpdateNodeData(node.id, 'videoOriginal', mediaValue);
+                            }
+                            if (trimmedUrl) {
+                              onUpdateNodeData(node.id, 'value', trimmedUrl);
+                              if (trimmedUrl.startsWith('data:') && isWorkflowReady(workflow.id)) {
+                                persistDataUrl(trimmedUrl, 'video-input-trim').then((url) => {
+                                  if (url !== trimmedUrl) {
+                                    onUpdateNodeData(node.id, 'value', url);
+                                  }
+                                });
+                              }
+                            }
+                            if (typeof node.data.videoOriginal === 'string' && node.data.videoOriginal.startsWith('data:') && isWorkflowReady(workflow.id)) {
+                              persistDataUrl(node.data.videoOriginal, 'video-input-original').then((url) => {
+                                if (url !== node.data.videoOriginal) {
+                                  onUpdateNodeData(node.id, 'videoOriginal', url);
+                                }
+                              });
+                            }
+                          }}
+                        />
+                      )}
                     </div>
-                  </div>
-                ) : (
-                  <label className="flex items-center justify-center gap-2 w-full py-3 border border-dashed border-slate-700 rounded-xl cursor-pointer hover:border-indigo-500 hover:bg-indigo-500/5 transition-all">
-                    <Upload size={12} className="text-slate-500" />
-                    <span className="text-[9px] font-black text-slate-500 uppercase">
-                      {lang === 'zh' ? '上传' : 'Upload'}
-                    </span>
-                    <input
-                      type="file"
-                      accept={node.toolId === 'audio-input' ? 'audio/*' : 'video/*'}
-                      className="hidden"
-                      onChange={(e) => handleFileUpload(e, false)}
-                    />
-                  </label>
-                )}
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -507,14 +848,14 @@ export const Node: React.FC<NodeProps> = ({
                     e.stopPropagation();
                     quickAddInput(node, p);
                   }}
-                  className="opacity-0 group-hover/port:opacity-100 transition-opacity p-1 bg-indigo-600 text-white rounded-lg absolute -left-12 z-20 shadow-xl hover:bg-indigo-500 active:scale-90 flex items-center justify-center"
+                  className="opacity-0 group-hover/port:opacity-100 transition-opacity p-1 bg-[#90dce1] text-white rounded-lg absolute -left-12 z-20 shadow-xl hover:bg-[#90dce1] active:scale-90 flex items-center justify-center"
                   title={t('quick_add_source')}
                 >
                   <Plus size={14} />
                 </button>
               )}
               <div
-                className="port w-3 h-3 rounded-full bg-slate-800 border-2 border-slate-950 absolute -left-[24px] cursor-crosshair hover:bg-indigo-500 transition-colors"
+                className="port w-3 h-3 rounded-full bg-slate-800 border-2 border-slate-950 absolute -left-[24px] cursor-crosshair hover:bg-[#90dce1] transition-colors"
                 onMouseDown={handlePortMouseDown(p, 'in')}
                 onMouseUp={handlePortMouseUp(p, 'in')}
               />
@@ -539,7 +880,7 @@ export const Node: React.FC<NodeProps> = ({
                     e.stopPropagation();
                     onSetOutputQuickAdd(showMenu ? null : { nodeId: node.id, portId: p.id });
                   }}
-                  className="opacity-0 group-hover/port:opacity-100 transition-opacity p-1 bg-indigo-600 text-white rounded-lg absolute -right-12 z-20 shadow-xl hover:bg-indigo-500 active:scale-90 flex items-center justify-center"
+                  className="opacity-0 group-hover/port:opacity-100 transition-opacity p-1 bg-[#90dce1] text-white rounded-lg absolute -right-12 z-20 shadow-xl hover:bg-[#90dce1] active:scale-90 flex items-center justify-center"
                   title={lang === 'zh' ? '快速添加节点' : 'Quick Add Node'}
                 >
                   <Plus size={14} />
@@ -557,7 +898,7 @@ export const Node: React.FC<NodeProps> = ({
                         e.stopPropagation();
                         quickAddOutput(node, p, tool.id);
                       }}
-                      className="w-full px-4 py-2 text-left text-xs text-slate-300 hover:bg-indigo-500/20 hover:text-white transition-colors flex items-center gap-2"
+                      className="w-full px-4 py-2 text-left text-xs text-slate-300 hover:bg-[#90dce1]/20 hover:text-white transition-colors flex items-center gap-2"
                     >
                       <div className="p-1 rounded bg-slate-700">
                         {React.createElement(getIcon(tool.icon), { size: 12 })}
@@ -569,7 +910,7 @@ export const Node: React.FC<NodeProps> = ({
               )}
               <span className="truncate">{p.label}</span>
               <div
-                className="port w-3 h-3 rounded-full bg-slate-800 border-2 border-slate-950 absolute -right-[24px] cursor-crosshair hover:bg-indigo-500 transition-colors"
+                className="port w-3 h-3 rounded-full bg-slate-800 border-2 border-slate-950 absolute -right-[24px] cursor-crosshair hover:bg-[#90dce1] transition-colors"
                 onMouseDown={handlePortMouseDown(p, 'out')}
                 onMouseUp={handlePortMouseUp(p, 'out')}
               />
@@ -586,13 +927,27 @@ export const Node: React.FC<NodeProps> = ({
             onSetExpandedOutput({ nodeId: node.id });
           }}
           onMouseDown={(e) => e.stopPropagation()}
-          className="absolute -right-36 top-0 max-w-32 max-h-32 bg-slate-800/95 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden cursor-pointer hover:scale-110 hover:border-indigo-500 transition-all z-30 group/thumb flex items-center justify-center"
+          className="absolute -right-36 top-0 max-w-32 max-h-32 bg-slate-800/95 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden cursor-pointer hover:scale-110 hover:border-[#90dce1] transition-all z-30 group/thumb flex items-center justify-center"
         >
           {firstOutputType === DataType.IMAGE ? (
             <img
-              src={Array.isArray(nodeResult) ? nodeResult[0] : nodeResult}
+              src={getAssetPath(
+                Array.isArray(nodeResult)
+                  ? (nodeResult.length > 0 ? nodeResult[0] : '')
+                  : (nodeResult || '')
+              )}
               className="max-w-full max-h-full w-auto h-auto object-contain"
               alt="Preview"
+              onError={(e) => {
+                // 如果图片加载失败，尝试使用原始值（可能是 base64）
+                const target = e.currentTarget;
+                const originalSrc = Array.isArray(nodeResult)
+                  ? (nodeResult.length > 0 ? nodeResult[0] : '')
+                  : (nodeResult || '');
+                if (target.src !== originalSrc) {
+                  target.src = originalSrc;
+                }
+              }}
             />
           ) : firstOutputType === DataType.TEXT ? (
             <div className="p-3 text-[8px] text-slate-300 overflow-hidden leading-snug font-medium selection:bg-transparent w-full h-full">
@@ -602,16 +957,20 @@ export const Node: React.FC<NodeProps> = ({
               ...
             </div>
           ) : firstOutputType === DataType.AUDIO ? (
-            <div className="w-full h-full flex flex-col items-center justify-center text-indigo-400 bg-indigo-500/5 min-w-32 min-h-24">
+            <div className="w-full h-full flex flex-col items-center justify-center text-[#90dce1] bg-[#90dce1]/5 min-w-32 min-h-24">
               <Volume2 size={32} className="mb-1" />
-              <div className="w-20 h-1.5 bg-indigo-500/20 rounded-full overflow-hidden">
-                <div className="w-1/2 h-full bg-indigo-500 animate-pulse"></div>
+              <div className="w-20 h-1.5 bg-[#90dce1]/20 rounded-full overflow-hidden">
+                <div className="w-1/2 h-full bg-[#90dce1] animate-pulse"></div>
               </div>
             </div>
           ) : (
             <div className="w-full h-full relative bg-black group/video min-w-32 min-h-24 flex items-center justify-center">
               <video
-                src={Array.isArray(nodeResult) ? nodeResult[0] : nodeResult}
+                src={getAssetPath(
+                  Array.isArray(nodeResult)
+                    ? (nodeResult.length > 0 ? nodeResult[0] : '')
+                    : (nodeResult || '')
+                )}
                 className="max-w-full max-h-full w-auto h-auto object-contain opacity-60 group-hover/thumb:opacity-100 transition-opacity"
                 muted
                 preload="none"
@@ -676,8 +1035,8 @@ export const Node: React.FC<NodeProps> = ({
                     }}
                     className={`w-full px-4 py-2 text-left text-xs transition-colors flex items-center gap-2 ${
                       node.data.model === model.id
-                        ? 'bg-indigo-500/20 text-white'
-                        : 'text-slate-300 hover:bg-indigo-500/20 hover:text-white'
+                        ? 'bg-[#90dce1]/20 text-white'
+                        : 'text-slate-300 hover:bg-[#90dce1]/20 hover:text-white'
                     }`}
                   >
                     <span>{model.name}</span>
@@ -690,7 +1049,7 @@ export const Node: React.FC<NodeProps> = ({
         )}
 
         {/* Web search toggle for DeepSeek and Doubao models */}
-        {node.toolId === 'text-generation' && 
+        {node.toolId === 'text-generation' &&
           (node.data.model?.startsWith('deepseek-') || node.data.model?.startsWith('doubao-')) && (
           <button
             onMouseDown={(e) => e.stopPropagation()}
@@ -700,7 +1059,7 @@ export const Node: React.FC<NodeProps> = ({
             }}
             className={`px-2 py-1 text-[9px] font-bold rounded-md transition-colors flex items-center gap-1 shadow-lg ${
               node.data.useSearch
-                ? 'bg-indigo-500/80 hover:bg-indigo-500 text-white'
+                ? 'bg-[#90dce1]/80 hover:bg-[#90dce1] text-white'
                 : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
             }`}
             title={lang === 'zh' ? '联网搜索' : 'Web Search'}
@@ -749,8 +1108,8 @@ export const Node: React.FC<NodeProps> = ({
                       }}
                       className={`w-full px-4 py-2 text-left text-xs transition-colors flex items-center gap-2 ${
                         node.data.voiceType === voice.voice_type
-                          ? 'bg-indigo-500/20 text-white'
-                          : 'text-slate-300 hover:bg-indigo-500/20 hover:text-white'
+                          ? 'bg-[#90dce1]/20 text-white'
+                          : 'text-slate-300 hover:bg-[#90dce1]/20 hover:text-white'
                       }`}
                     >
                       <span className="truncate">{voice.name || voice.voice_type}</span>
@@ -797,8 +1156,8 @@ export const Node: React.FC<NodeProps> = ({
                     }}
                     className={`w-full px-4 py-2 text-left text-xs transition-colors flex items-center gap-2 ${
                       node.data.speakerId === voice.speaker_id
-                        ? 'bg-indigo-500/20 text-white'
-                        : 'text-slate-300 hover:bg-indigo-500/20 hover:text-white'
+                        ? 'bg-[#90dce1]/20 text-white'
+                        : 'text-slate-300 hover:bg-[#90dce1]/20 hover:text-white'
                     }`}
                   >
                     <span className="truncate">{voice.name || voice.speaker_id}</span>
@@ -813,4 +1172,3 @@ export const Node: React.FC<NodeProps> = ({
     </div>
   );
 };
-

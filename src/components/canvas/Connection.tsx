@@ -33,7 +33,11 @@ export const Connection: React.FC<ConnectionProps> = ({
   const outputPortIndex = sourceOutputs.findIndex((p) => p.id === connection.sourcePortId);
   const inputPortIndex = targetInputs.findIndex((p) => p.id === connection.targetPortId);
 
-  const x1 = sourceNode.x + 224; // Output port center X
+  const sourceTool = TOOLS.find((t) => t.id === sourceNode.toolId);
+  const isSourceInput = sourceTool?.category === 'Input';
+  const sourceNodeWidth = isSourceInput ? 320 : 224;
+  const portOffset = 18;
+  const x1 = sourceNode.x + sourceNodeWidth; // Output port center X
   const nodeBottomY = sourceNode.y + sourceNodeHeight;
   const y1 = nodeBottomY - ((sourceOutputs.length - 1 - outputPortIndex) * 30) - 24; // Output port center Y
   const x2 = targetNode.x; // Input port center X
@@ -57,13 +61,13 @@ export const Connection: React.FC<ConnectionProps> = ({
       />
       <path
         d={path}
-        stroke={isSelected ? '#818cf8' : '#312e81'}
+        stroke={isSelected ? '#90dce1' : '#5fb3b9'}
         strokeWidth={isSelected ? 4 : 3}
         fill="none"
         className="connection-path transition-all"
       />
       {isTargetRunning && (
-        <circle r="4" fill="#818cf8" className="shadow-lg shadow-indigo-500/50">
+        <circle r="4" fill="#90dce1" className="shadow-lg shadow-[#90dce1]/50">
           <animateMotion path={path} dur="1.5s" repeatCount="indefinite" />
         </circle>
       )}
@@ -90,4 +94,3 @@ export const Connection: React.FC<ConnectionProps> = ({
     </g>
   );
 };
-

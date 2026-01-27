@@ -17,6 +17,7 @@ import { TOOLS } from '../../../constants';
 import { useTranslation, Language } from '../../i18n/useTranslation';
 import { getIcon } from '../../utils/icons';
 import { formatTime } from '../../utils/format';
+import { getAssetPath } from '../../utils/assetPath';
 
 interface ResultsPanelProps {
   lang: Language;
@@ -57,7 +58,7 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({
         <div className="flex items-center gap-6">
           <button
             onClick={onToggleCollapsed}
-            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400 hover:text-indigo-300 transition-all"
+            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-#90dce1 hover:text-indigo-300 transition-all"
           >
             <History size={16} />
             {t('execution_results')}
@@ -71,7 +72,7 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({
                 className="flex items-center gap-2 text-[9px] font-black uppercase text-slate-400 hover:text-indigo-300 transition-all"
               >
                 {workflow.showIntermediateResults ? (
-                  <ToggleRight size={16} className="text-indigo-500" />
+                  <ToggleRight size={16} className="text-#90dce1" />
                 ) : (
                   <ToggleLeft size={16} />
                 )}
@@ -88,7 +89,7 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({
                 onClick={() => onSelectRun(r.id)}
                 className={`group relative px-4 py-1.5 rounded-full text-[9px] font-bold border transition-all ${
                   selectedRunId === r.id
-                    ? 'bg-indigo-600 border-indigo-500 text-white'
+                    ? 'bg-#90dce1 border-#90dce1 text-white'
                     : 'bg-slate-800 border-slate-700 text-slate-400'
                 }`}
               >
@@ -151,7 +152,7 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({
                       {(node.status === NodeStatus.RUNNING || node.executionTime !== undefined) && (
                         <span
                           className={`text-[8px] font-bold ${
-                            node.status === NodeStatus.RUNNING ? 'text-indigo-400' : 'text-slate-600'
+                            node.status === NodeStatus.RUNNING ? 'text-#90dce1' : 'text-slate-600'
                           }`}
                         >
                           {t('run_time')}: {elapsed}
@@ -170,7 +171,7 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({
                           {onPinOutputToCanvas && (
                             <button
                               onClick={() => onPinOutputToCanvas(res, type)}
-                              className="p-1.5 text-slate-500 hover:text-indigo-400 transition-all"
+                              className="p-1.5 text-slate-500 hover:text-#90dce1 transition-all"
                             >
                               <ArrowUpRight size={14} />
                             </button>
@@ -199,33 +200,44 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({
                             <div
                               key={k}
                               onClick={() => onExpandOutput(node.id, k)}
-                              className="group/field p-2 bg-slate-900/60 rounded-lg border border-slate-800 hover:border-indigo-500/50 cursor-pointer transition-all"
+                              className="group/field p-2 bg-slate-900/60 rounded-lg border border-slate-800 hover:border-#90dce1/50 cursor-pointer transition-all"
                             >
                               <div className="flex items-center justify-between mb-1">
-                                <span className="text-[8px] font-black text-indigo-400 uppercase tracking-tighter">
+                                <span className="text-[8px] font-black text-#90dce1 uppercase tracking-tighter">
                                   {k}
                                 </span>
-                                <Maximize2 size={8} className="text-slate-600 group-hover/field:text-indigo-400" />
+                                <Maximize2 size={8} className="text-slate-600 group-hover/field:text-#90dce1" />
                               </div>
                               <p className="text-[9px] text-slate-400 line-clamp-1">{v as string}</p>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-[10px] text-slate-400 line-clamp-4 leading-relaxed">{res}</p>
+                        <p
+                          onClick={() => onExpandOutput(node.id)}
+                          className="text-[10px] text-slate-400 line-clamp-4 leading-relaxed cursor-pointer hover:text-slate-200 transition-colors"
+                        >
+                          {res}
+                        </p>
                       )
                     ) : type === DataType.IMAGE ? (
-                      <div className="flex gap-2 overflow-x-auto h-full pb-1 custom-scrollbar">
+                      <div
+                        onClick={() => onExpandOutput(node.id)}
+                        className="flex gap-2 overflow-x-auto h-full pb-1 custom-scrollbar cursor-pointer"
+                      >
                         {(Array.isArray(res) ? res : [res]).map((img, i) => (
                           <img
                             key={i}
-                            src={img}
+                            src={getAssetPath(img)}
                             className="h-full w-auto object-cover rounded-lg border border-slate-800"
                           />
                         ))}
                       </div>
                     ) : (
-                      <div className="flex items-center justify-center h-full text-indigo-400">
+                      <div
+                        onClick={() => onExpandOutput(node.id)}
+                        className="flex items-center justify-center h-full text-#90dce1 cursor-pointer hover:text-[#90dce1] transition-colors"
+                      >
                         {type === DataType.AUDIO ? <Volume2 size={24} /> : <VideoIcon size={24} />}
                       </div>
                     )}
@@ -239,5 +251,3 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({
     </footer>
   );
 };
-
-

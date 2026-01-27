@@ -122,7 +122,7 @@ export const CloneVoiceModal: React.FC<CloneVoiceModalProps> = ({
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full p-6 border-2 border-dashed border-slate-700 rounded-xl hover:border-indigo-500 transition-all text-slate-400 hover:text-slate-200"
+                  className="w-full p-6 border-2 border-dashed border-slate-700 rounded-xl hover:border-[#90dce1] transition-all text-slate-400 hover:text-slate-200"
                 >
                   {audioFile ? audioFile.name : 'Click to select audio or video file'}
                 </button>
@@ -135,7 +135,7 @@ export const CloneVoiceModal: React.FC<CloneVoiceModalProps> = ({
                   value={audioText}
                   onChange={e => setAudioText(e.target.value)}
                   placeholder="Enter the text content of the audio for better accuracy..."
-                  className="w-full h-24 bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm text-slate-200 placeholder-slate-500 focus:border-indigo-500 focus:outline-none resize-none"
+                  className="w-full h-24 bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm text-slate-200 placeholder-slate-500 focus:border-[#90dce1] focus:outline-none resize-none"
                 />
               </div>
 
@@ -146,7 +146,7 @@ export const CloneVoiceModal: React.FC<CloneVoiceModalProps> = ({
                   value={voiceName}
                   onChange={e => setVoiceName(e.target.value)}
                   placeholder="Give this voice a name..."
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm text-slate-200 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm text-slate-200 placeholder-slate-500 focus:border-[#90dce1] focus:outline-none"
                 />
               </div>
             </div>
@@ -161,7 +161,7 @@ export const CloneVoiceModal: React.FC<CloneVoiceModalProps> = ({
               <button
                 onClick={handleClone}
                 disabled={!audioFile || isProcessing}
-                className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-3 bg-[#90dce1] text-white rounded-xl hover:bg-[#7dd3da] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isProcessing ? 'Processing...' : 'Clone Voice'}
               </button>
@@ -172,5 +172,3 @@ export const CloneVoiceModal: React.FC<CloneVoiceModalProps> = ({
     </div>
   );
 };
-
-

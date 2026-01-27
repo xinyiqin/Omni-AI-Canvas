@@ -1,3 +1,4 @@
+import { ChatMessage } from './src/hooks/useAIChatWorkflow';
 
 export enum DataType {
   TEXT = 'TEXT',
@@ -55,6 +56,7 @@ export interface WorkflowNode {
   error?: string;
   executionTime?: number; // In milliseconds
   startTime?: number; // performance.now() when node starts running
+  completedAt?: number; // Date.now() when node finishes
 }
 
 export interface Connection {
@@ -86,6 +88,12 @@ export interface WorkflowState {
     lightx2v_token: string;
   };
   history: GenerationRun[];
+  chatHistory?: ChatMessage[]; // AI 对话历史
   updatedAt: number;
   showIntermediateResults: boolean;
+  visibility?: 'private' | 'public';
+  thumsupCount?: number;
+  thumsupLiked?: boolean;
+  authorName?: string;
+  authorId?: string;
 }

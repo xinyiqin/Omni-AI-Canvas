@@ -2,8 +2,8 @@ import { useState } from 'react';
 
 export const useModalState = () => {
   const [showCloneVoiceModal, setShowCloneVoiceModal] = useState(false);
-  const [showAIGenerateModal, setShowAIGenerateModal] = useState(false);
   const [showAudioEditor, setShowAudioEditor] = useState<string | null>(null); // nodeId of audio input being edited
+  const [showVideoEditor, setShowVideoEditor] = useState<string | null>(null); // nodeId of video input being edited
   const [expandedOutput, setExpandedOutput] = useState<{ nodeId: string; fieldId?: string } | null>(null);
   const [isEditingResult, setIsEditingResult] = useState(false);
   const [tempEditValue, setTempEditValue] = useState("");
@@ -11,12 +11,12 @@ export const useModalState = () => {
   const [showOutputQuickAdd, setShowOutputQuickAdd] = useState<{ nodeId: string; portId: string } | null>(null);
   const [showModelSelect, setShowModelSelect] = useState<string | null>(null);
   const [showVoiceSelect, setShowVoiceSelect] = useState<string | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [resultsCollapsed, setResultsCollapsed] = useState(true);
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
   const [isAIChatCollapsed, setIsAIChatCollapsed] = useState(false);
   const [nodeConfigPanelCollapsed, setNodeConfigPanelCollapsed] = useState(false);
-  
+
   // AI Chat Panel 位置和大小（浮动窗口）
   const [aiChatPanelPosition, setAiChatPanelPosition] = useState<{ x: number; y: number }>(() => {
     const saved = localStorage.getItem('omniflow_ai_chat_panel_position');
@@ -43,7 +43,7 @@ export const useModalState = () => {
     }
     return { x: 0, y: 0 };
   });
-  
+
   const [aiChatPanelSize, setAiChatPanelSize] = useState<{ width: number; height: number }>(() => {
     const saved = localStorage.getItem('omniflow_ai_chat_panel_size');
     if (saved) {
@@ -55,7 +55,7 @@ export const useModalState = () => {
     }
     return { width: 400, height: 500 };
   });
-  
+
   // 右侧面板高度比例（NodeConfigPanel 占用的比例，0-1之间）
   const [rightPanelSplitRatio, setRightPanelSplitRatio] = useState<number>(() => {
     const saved = localStorage.getItem('omniflow_right_panel_split_ratio');
@@ -66,17 +66,17 @@ export const useModalState = () => {
     // Modal states
     showCloneVoiceModal,
     setShowCloneVoiceModal,
-    showAIGenerateModal,
-    setShowAIGenerateModal,
     showAudioEditor,
     setShowAudioEditor,
+    showVideoEditor,
+    setShowVideoEditor,
     expandedOutput,
     setExpandedOutput,
     isEditingResult,
     setIsEditingResult,
     tempEditValue,
     setTempEditValue,
-    
+
     // Menu states
     showReplaceMenu,
     setShowReplaceMenu,
@@ -86,32 +86,31 @@ export const useModalState = () => {
     setShowModelSelect,
     showVoiceSelect,
     setShowVoiceSelect,
-    
+
         // Panel states
         sidebarCollapsed,
         setSidebarCollapsed,
         resultsCollapsed,
         setResultsCollapsed,
-        
+
         // AI Chat states
         isAIChatOpen,
         setIsAIChatOpen,
         isAIChatCollapsed,
         setIsAIChatCollapsed,
-        
+
         // NodeConfigPanel states
         nodeConfigPanelCollapsed,
         setNodeConfigPanelCollapsed,
-        
+
         // AI Chat Panel position and size
         aiChatPanelPosition,
         setAiChatPanelPosition,
         aiChatPanelSize,
         setAiChatPanelSize,
-        
+
         // Right panel split ratio
         rightPanelSplitRatio,
         setRightPanelSplitRatio
       };
     };
-

@@ -2,6 +2,96 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { initLightX2VToken } from './src/utils/apiClient';
+
+// 声明全局类型
+declare global {
+  interface Window {
+    __POWERED_BY_QIANKUN__?: boolean;
+    __INJECTED_PUBLIC_PATH_BY_QIANKUN__?: string;
+  }
+}
+
+// qiankun 生命周期函数
+let root: any = null;
+
+/**
+ * bootstrap 只会在微应用初始化的时候调用一次，下次微应用重新进入时会直接调用 mount 钩子，不会再重复触发 bootstrap。
+ */
+export async function bootstrap() {
+  console.log('[React] Canvas app bootstrapped');
+}
+
+/**
+ * 应用每次进入都会调用 mount 方法，通常我们在这里触发应用的渲染方法
+ */
+export async function mount(props: any) {
+  console.log('[React] Canvas app mounted', props);
+
+  // 设置资源基础路径
+  (window as any).__ASSET_BASE_PATH__ = '/canvas';
+
+  // 将共享的状态和方法挂载到 window，供 App 组件使用
+  if (props?.sharedStore) {
+    (window as any).__SHARED_STORE__ = props.sharedStore;
+  }
+  if (props?.apiClient) {
+    (window as any).__API_CLIENT__ = props.apiClient;
+  }
+  if (props?.setGlobalState) {
+    (window as any).__SET_GLOBAL_STATE__ = props.setGlobalState;
+  }
+  if (props?.onGlobalStateChange) {
+    (window as any).__ON_GLOBAL_STATE_CHANGE__ = props.onGlobalStateChange;
+  }
+
+  // 初始化 LIGHTX2V_TOKEN：如果用户已登录，使用用户的 accessToken
+  initLightX2VToken();
+
+  // 检查环境变量（用于调试）
+  console.log('[Canvas App] 环境变量检查:', {
+    DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY ? `${process.env.DEEPSEEK_API_KEY.substring(0, 10)}...` : '未设置',
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY ? `${process.env.GEMINI_API_KEY.substring(0, 10)}...` : '未设置',
+    PPCHAT_API_KEY: process.env.PPCHAT_API_KEY ? `${process.env.PPCHAT_API_KEY.substring(0, 10)}...` : '未设置',
+    LIGHTX2V_URL: process.env.LIGHTX2V_URL || '未设置',
+    LIGHTX2V_CLOUD_URL: process.env.LIGHTX2V_CLOUD_URL || '未设置',
+    LIGHTX2V_CLOUD_TOKEN: process.env.LIGHTX2V_CLOUD_TOKEN ? `${process.env.LIGHTX2V_CLOUD_TOKEN.substring(0, 10)}...` : '未设置',
+  });
+
+  const rootElement = props?.container
+    ? props.container.querySelector('#root')
+    : document.getElementById('root');
+
+  if (!rootElement) {
+    throw new Error("Could not find root element to mount to");
+  }
+
+  root = ReactDOM.createRoot(rootElement);
+  root.render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    </React.StrictMode>
+  );
+}
+
+/**
+ * 应用每次 切出/卸载 会调用的方法，通常在这里我们会卸载微应用的应用实例
+ */
+export async function unmount(props: any) {
+  console.log('[React] Canvas app unmounted', props);
+  if (root) {
+    root.unmount();
+    root = null;
+  }
+
+  // 清理全局变量
+  delete (window as any).__SHARED_STORE__;
+  delete (window as any).__API_CLIENT__;
+  delete (window as any).__SET_GLOBAL_STATE__;
+  delete (window as any).__ON_GLOBAL_STATE_CHANGE__;
+}
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component<
@@ -101,24 +191,55 @@ class ErrorBoundary extends React.Component<
 // Global error handlers
 window.addEventListener('error', (event) => {
   console.error('Global error:', event.error);
-  // Don't prevent default - let Error Boundary handle it
 });
 
 window.addEventListener('unhandledrejection', (event) => {
   console.error('Unhandled promise rejection:', event.reason);
-  event.preventDefault(); // Prevent the default browser behavior
+  event.preventDefault();
 });
 
-const rootElement = document.getElementById('root');
-if (!rootElement) {
-  throw new Error("Could not find root element to mount to");
+// 确保生命周期被注册到 window.moudleQiankunAppLifeCycles
+// vite-plugin-qiankun 应该会自动处理，但手动注册确保兼容性
+if (typeof window !== 'undefined') {
+  // 设置资源基础路径
+  // 在 qiankun 环境中为 /canvas，独立运行时为空字符串（因为 base 是 /）
+  (window as any).__ASSET_BASE_PATH__ = (window as any).__POWERED_BY_QIANKUN__ ? '/canvas' : '';
+
+  if (!window.moudleQiankunAppLifeCycles) {
+    (window as any).moudleQiankunAppLifeCycles = {};
+  }
+  (window as any).moudleQiankunAppLifeCycles['react-canvas'] = {
+    bootstrap,
+    mount,
+    unmount
+  };
+  console.log('[React] 生命周期已注册到 window.moudleQiankunAppLifeCycles');
 }
 
-const root = ReactDOM.createRoot(rootElement);
-root.render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  </React.StrictMode>
-);
+// 如果不是 qiankun 环境，直接渲染（独立运行）
+if (!window.__POWERED_BY_QIANKUN__) {
+  // 初始化 LIGHTX2V_TOKEN：如果用户已登录，使用用户的 accessToken
+  initLightX2VToken();
+
+  // 检查环境变量（用于调试）
+  console.log('[Canvas App] 环境变量检查（独立运行）:', {
+    DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY ? `${process.env.DEEPSEEK_API_KEY.substring(0, 10)}...` : '未设置',
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY ? `${process.env.GEMINI_API_KEY.substring(0, 10)}...` : '未设置',
+    PPCHAT_API_KEY: process.env.PPCHAT_API_KEY ? `${process.env.PPCHAT_API_KEY.substring(0, 10)}...` : '未设置',
+    LIGHTX2V_URL: process.env.LIGHTX2V_URL || '未设置',
+  });
+
+  const rootElement = document.getElementById('root');
+  if (!rootElement) {
+    throw new Error("Could not find root element to mount to");
+  }
+
+  const standaloneRoot = ReactDOM.createRoot(rootElement);
+  standaloneRoot.render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    </React.StrictMode>
+  );
+}

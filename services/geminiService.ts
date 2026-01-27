@@ -1,5 +1,6 @@
 
 import { GoogleGenAI, Modality, Type } from "@google/genai";
+import { apiRequest } from '../src/utils/apiClient';
 
 export interface OutputField {
   id: string;
@@ -63,15 +64,15 @@ const wrapPcmInWav = (base64Pcm: string, sampleRate = 24000): string => {
 };
 
 export const geminiText = async (
-  prompt: string, 
-  useSearch = false, 
-  mode = 'basic', 
-  customInstruction?: string, 
+  prompt: string,
+  useSearch = false,
+  mode = 'basic',
+  customInstruction?: string,
   model = 'gemini-3-pro-preview',
   outputFields?: OutputField[]
 ): Promise<any> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
+
   const systemInstructions: Record<string, string> = {
     basic: "You are a helpful and versatile AI assistant. Provide clear, accurate, and direct answers.",
     enhance: "You are a Prompt Engineering Expert. Enhance the user's input into a detailed prompt. Output ONLY the enhanced prompt.",
@@ -82,14 +83,14 @@ export const geminiText = async (
     polish: "Refine text for clarity and tone.",
   };
 
-  const baseInstruction = mode === 'custom' && customInstruction 
-    ? customInstruction 
+  const baseInstruction = mode === 'custom' && customInstruction
+    ? customInstruction
     : (systemInstructions[mode] || systemInstructions.basic);
 
   const hasMultipleOutputs = outputFields && outputFields.length > 0;
   const outputKeys = outputFields?.map(f => f.id) || [];
-  
-  const finalInstruction = hasMultipleOutputs 
+
+  const finalInstruction = hasMultipleOutputs
     ? `${baseInstruction}\n\nIMPORTANT: You MUST generate content for each field: ${outputKeys.join(', ')}.`
     : baseInstruction;
 
@@ -129,7 +130,7 @@ export const geminiText = async (
 export const geminiImage = async (prompt: string, imageInput?: string | string[] | any[], aspectRatio = "1:1", model = 'gemini-2.5-flash-image'): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const parts: any[] = [{ text: prompt }];
-  
+
   if (imageInput) {
     const inputs = Array.isArray(imageInput) ? imageInput : [imageInput];
     const flatInputs = inputs.flat().filter(img => img && typeof img === 'string');
@@ -144,7 +145,7 @@ export const geminiImage = async (prompt: string, imageInput?: string | string[]
     contents: { parts: parts },
     config: { imageConfig: { aspectRatio: aspectRatio as any } }
   });
-  
+
   for (const part of response.candidates?.[0]?.content?.parts || []) {
     if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
   }
@@ -187,6 +188,127 @@ export const geminiVideo = async (prompt: string, imageBase64?: string, aspectRa
 };
 
 /**
+ * ============================================================================
+ * LightX2V Unified API Client
+ * ============================================================================
+ * 统一的 LightX2V API 请求函数，处理 apiClient 和直接 fetch 两种模式
+ */
+
+interface LightX2VRequestOptions {
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  headers?: Record<string, string>;
+  body?: string | FormData;
+  accept?: string;
+}
+
+interface LightX2VRequestConfig {
+  baseUrl: string;
+  token: string;
+  endpoint: string;
+  options?: LightX2VRequestOptions;
+  requireToken?: boolean; // 是否要求 token（使用 apiClient 时可以为 false）
+}
+
+/**
+ * 统一的 LightX2V API 请求函数
+ * @param config 请求配置
+ * @returns Response 对象
+ */
+async function lightX2VRequest(config: LightX2VRequestConfig): Promise<Response> {
+  const { baseUrl, token, endpoint, options = {}, requireToken = true } = config;
+
+  // 验证 baseUrl 格式
+  if (baseUrl && baseUrl.trim() && !baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+    throw new Error("Base URL must be a valid HTTP/HTTPS URL or empty string for relative path");
+  }
+
+  // 判断是否使用 apiClient（baseUrl 为空时使用）
+  const useApiClient = !baseUrl || !baseUrl.trim();
+
+  // 使用 apiClient 时，不需要检查 token（后端会使用环境变量中的 LIGHTX2V_TOKEN）
+  if (!useApiClient && requireToken && (!token || !token.trim())) {
+    throw new Error("Access Token is required for LightX2V");
+  }
+
+  // 构建 URL
+  const normalizedBaseUrl = useApiClient ? '' : baseUrl.replace(/\/$/, '');
+  const url = useApiClient
+    ? endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+    : `${normalizedBaseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+
+  // 构建 headers
+  const defaultHeaders: Record<string, string> = {
+    'Accept': options.accept || 'application/json'
+  };
+
+  if (options.method === 'POST' || options.method === 'PUT' || options.method === 'PATCH') {
+    if (!(options.body instanceof FormData)) {
+      defaultHeaders['Content-Type'] = 'application/json; charset=utf-8';
+    }
+  }
+
+  const headers: Record<string, string> = {
+    ...defaultHeaders,
+    ...(options.headers || {})
+  };
+
+  // 使用 apiClient 时，不传递 LightX2V token（apiRequest 会自动使用主应用的 JWT token）
+  // 不使用 apiClient 时，传递 LightX2V token
+  if (!useApiClient && requireToken) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  // 执行请求
+  if (useApiClient) {
+    return await apiRequest(url, {
+      method: options.method || 'GET',
+      headers,
+      body: options.body
+    });
+  } else {
+    return await fetch(url, {
+      method: options.method || 'GET',
+      headers,
+      body: options.body
+    });
+  }
+}
+
+/**
+ * 统一的错误处理函数
+ */
+async function handleLightX2VError(response: Response, context: string): Promise<never> {
+  let errorMessage = `LightX2V ${context} Failed (${response.status})`;
+  try {
+    const errText = await response.text();
+    if (errText.trim().startsWith('{') || errText.trim().startsWith('[')) {
+      try {
+        const errorData = JSON.parse(errText);
+        errorMessage = errorData.error || errorData.message || errorMessage;
+        if (errorData.detail) errorMessage += `: ${errorData.detail}`;
+      } catch {
+        errorMessage = errText.trim() || errorMessage;
+      }
+    } else {
+      errorMessage = errText.trim() || errorMessage;
+    }
+  } catch (e: any) {
+    errorMessage = e.message || errorMessage;
+  }
+  console.error(`[LightX2V] ${context} error: ${errorMessage}`, {
+    status: response.status,
+    url: response.url
+  });
+  throw new Error(errorMessage);
+}
+
+/**
+ * ============================================================================
+ * LightX2V API Functions
+ * ============================================================================
+ */
+
+/**
  * LightX2V Video/Image Service Integration
  * Generalized to handle T2V, I2V, S2V, T2I, and I2I
  */
@@ -205,12 +327,26 @@ export const lightX2VTask = async (
   onTaskId?: (taskId: string) => void,
   abortSignal?: AbortSignal
 ): Promise<string> => {
-  if (!baseUrl || !baseUrl.trim()) throw new Error("Base URL is required for LightX2V");
-  if (!token || !token.trim()) throw new Error("Access Token is required for LightX2V");
+  // Check if this is a cloud model (ends with -cloud)
+  // If so, use cloud config instead of provided baseUrl/token
+  let actualBaseUrl = baseUrl;
+  let actualToken = token;
+
+  if (modelCls.endsWith('-cloud')) {
+    // Cloud model - use cloud config
+    const cloudConfig = getLightX2VConfigForModel(modelCls);
+    actualBaseUrl = cloudConfig.url;
+    actualToken = cloudConfig.token;
+    // Remove -cloud suffix for actual API call
+    modelCls = modelCls.replace(/-cloud$/, '');
+    console.log('[LightX2V] Using cloud backend for model:', modelCls);
+  }
+
+  console.log('[LightX2V] baseUrl:', actualBaseUrl);
 
   const formatMediaPayload = (val: string | string[] | undefined, isAudio = false) => {
     if (!val) return undefined;
-    
+
     // Handle multiple images (array) - for i2i tasks with multiple input images
     // According to lightx2v server (utils.py:177-185), server expects:
     // - For base64: list of base64 strings (may include data:image prefix)
@@ -219,7 +355,8 @@ export const lightX2VTask = async (
       // Process each image: extract base64 from data URLs, keep URLs as-is
       const processedImages = val.map(img => {
         if (typeof img !== 'string') return img;
-        if (img.startsWith('http')) {
+        // Check if it's a URL (absolute http/https, or relative path starting with ./ or /)
+        if (img.startsWith('http://') || img.startsWith('https://') || img.startsWith('./') || img.startsWith('/')) {
           // URL - server will fetch it via fetch_resource
           return img;
         } else {
@@ -236,24 +373,28 @@ export const lightX2VTask = async (
           }
         }
       });
-      
+
       // Server expects: { type: "base64", data: ["base64string1", "base64string2", ...] }
       // OR { type: "url", data: ["url1", "url2", ...] }
-      // Note: Server's preload_data handles list by checking if first item starts with "data:image"
-      // For consistency, if any item is a URL, we should use type "url" for all
-      // But server code suggests it expects base64 list, so we'll use base64 for mixed arrays
-      // and let server handle URL fetching if needed
-      const hasUrl = processedImages.some(img => typeof img === 'string' && img.startsWith('http'));
+      // Check if any item is a URL (absolute or relative)
+      const hasUrl = processedImages.some(img =>
+        typeof img === 'string' &&
+        (img.startsWith('http://') || img.startsWith('https://') || img.startsWith('./') || img.startsWith('/'))
+      );
       const type = hasUrl ? "url" : "base64";
-      
+
       return { type: type, data: processedImages };
     }
-    
+
     // Single value handling (original logic)
     const singleVal = val as string;
-    const isUrl = singleVal.startsWith('http');
+    // Check if it's a URL (absolute http/https, or relative path starting with ./ or /)
+    const isUrl = singleVal.startsWith('http://') ||
+                  singleVal.startsWith('https://') ||
+                  singleVal.startsWith('./') ||
+                  singleVal.startsWith('/');
     const type = isUrl ? "url" : "base64";
-    
+
     // Process the data content
     let dataContent = singleVal;
     if (!isUrl) {
@@ -263,23 +404,29 @@ export const lightX2VTask = async (
         dataContent = wrapPcmInWav(dataContent, 24000);
       }
     }
-    
+
     // Use 'data' as the field name for both types as the server error 'data'! suggests
     return { type: type, data: dataContent };
   };
 
-  const normalizedBaseUrl = baseUrl.replace(/\/$/, '');
-
-  // 1. Submit Task (POST /api/v1/task/submit)
-  const submitUrl = `${normalizedBaseUrl}/api/v1/task/submit`;
+  // 参考主应用的做法构建 payload
   const payload: any = {
     task: task,
     model_cls: modelCls,
     stage: "single_stage",
+    seed: Math.floor(Math.random() * 1000000), // 参考主应用：生成随机 seed
     prompt: prompt || ""
   };
 
+  // 添加尺寸参数（参考主应用）
   if (aspectRatio) payload.aspect_ratio = aspectRatio;
+
+  // 添加 negative_prompt（参考主应用：对于 wan2.1/wan2.2 模型）
+  if (modelCls.startsWith('wan2.1') || modelCls.startsWith('wan2.2')) {
+    payload.negative_prompt = "镜头晃动，色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走";
+  }
+
+  // 添加媒体输入（参考主应用的格式）
   if (inputImage) payload.input_image = formatMediaPayload(inputImage);
   if (inputAudio) payload.input_audio = formatMediaPayload(inputAudio, true);
   // Replaced 'last_frame' with 'input_last_frame' as required by the flf2v task
@@ -287,81 +434,57 @@ export const lightX2VTask = async (
   // Support for input video (used in character swap/animate task)
   if (inputVideo) payload.input_video = formatMediaPayload(inputVideo);
 
-  const submitRes = await fetch(submitUrl, {
+  // 对于 s2v 任务，如果使用多人模式，可能需要添加 negative_prompt
+  // 主应用中 s2v 任务也会添加 negative_prompt（但内容略有不同）
+  if (task === 's2v') {
+    payload.negative_prompt = "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走";
+  }
+
+  // 1. Submit Task (POST /api/v1/task/submit)
+  const submitRes = await lightX2VRequest({
+    baseUrl: actualBaseUrl,
+    token: actualToken,
+    endpoint: '/api/v1/task/submit',
+    options: {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/json'
-    },
     body: JSON.stringify(payload)
+    }
   });
 
   if (!submitRes.ok) {
-    let errorMessage = `LightX2V Submit Failed (${submitRes.status})`;
-    try {
-    const errText = await submitRes.text();
-      if (errText.trim().startsWith('{') || errText.trim().startsWith('[')) {
-        try {
-          const errorData = JSON.parse(errText);
-          errorMessage = errorData.error || errorData.message || errorMessage;
-          if (errorData.detail) errorMessage += `: ${errorData.detail}`;
-        } catch {
-          errorMessage = errText.trim() || errorMessage;
-        }
-      } else {
-        errorMessage = errText.trim() || errorMessage;
-      }
-    } catch (e: any) {
-      errorMessage = e.message || errorMessage;
-    }
-    console.error(`[LightX2V] Submit error: ${errorMessage}`, { task, modelCls, prompt: prompt?.substring(0, 50) });
-    throw new Error(errorMessage);
+    await handleLightX2VError(submitRes, 'Submit');
   }
 
   const submitData = await submitRes.json();
   const taskId = submitData.task_id;
   if (!taskId) throw new Error("No task_id returned from LightX2V submission");
 
+  // Call onTaskId callback if provided (for tracking task IDs for cancellation)
+  if (onTaskId) {
+    onTaskId(taskId);
+  }
+
   // 2. Poll Task Status
-  const queryUrl = `${normalizedBaseUrl}/api/v1/task/query?task_id=${taskId}`;
   let status = "PENDING";
   let maxAttempts = 120; // 10 minutes total
-  
+
   while (status !== "SUCCEED" && status !== "FAILED" && status !== "CANCELLED" && maxAttempts > 0) {
     await new Promise(res => setTimeout(res, 5000));
-    const queryRes = await fetch(queryUrl, {
-      method: 'GET',
-      headers: { 
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
+    const queryRes = await lightX2VRequest({
+      baseUrl: actualBaseUrl,
+      token: actualToken,
+      endpoint: `/api/v1/task/query?task_id=${taskId}`,
+      options: {
+        method: 'GET'
       }
     });
-    
+
     if (!queryRes.ok) {
-      let errorMessage = `Polling status failed (${queryRes.status})`;
-      try {
-        const errText = await queryRes.text();
-        if (errText.trim().startsWith('{')) {
-          try {
-            const errorData = JSON.parse(errText);
-            errorMessage = errorData.error || errorData.message || errorMessage;
-            if (errorData.detail) errorMessage += `: ${errorData.detail}`;
-          } catch {
-            errorMessage = errText.trim() || errorMessage;
-          }
-        } else {
-          errorMessage = errText.trim() || errorMessage;
-        }
-      } catch (e: any) {
-        errorMessage = e.message || errorMessage;
-      }
-      console.error(`[LightX2V] Polling error: ${errorMessage}`, { taskId });
-      throw new Error(errorMessage);
+      await handleLightX2VError(queryRes, `Polling (task_id: ${taskId})`);
     }
     const taskInfo = await queryRes.json();
     status = taskInfo.status;
-    
+
     if (status === "FAILED") {
       throw new Error(`LightX2V Task Failed: ${taskInfo.error || 'Server processing error'}`);
     }
@@ -373,35 +496,17 @@ export const lightX2VTask = async (
   }
 
   // 3. Get Result URL
-  const resultUrlEndpoint = `${normalizedBaseUrl}/api/v1/task/result_url?task_id=${taskId}&name=${outputName}`;
-  const resultRes = await fetch(resultUrlEndpoint, {
-    method: 'GET',
-    headers: { 
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/json'
+  const resultRes = await lightX2VRequest({
+    baseUrl: actualBaseUrl,
+    token: actualToken,
+    endpoint: `/api/v1/task/result_url?task_id=${taskId}&name=${outputName}`,
+    options: {
+      method: 'GET'
     }
   });
 
   if (!resultRes.ok) {
-    let errorMessage = `Failed to fetch result URL (${resultRes.status})`;
-    try {
-      const errText = await resultRes.text();
-      if (errText.trim().startsWith('{')) {
-        try {
-          const errorData = JSON.parse(errText);
-          errorMessage = errorData.error || errorData.message || errorMessage;
-          if (errorData.detail) errorMessage += `: ${errorData.detail}`;
-        } catch {
-          errorMessage = errText.trim() || errorMessage;
-        }
-      } else {
-        errorMessage = errText.trim() || errorMessage;
-      }
-    } catch (e: any) {
-      errorMessage = e.message || errorMessage;
-    }
-    console.error(`[LightX2V] Result URL error: ${errorMessage}`, { taskId, outputName });
-    throw new Error(errorMessage);
+    await handleLightX2VError(resultRes, `Result URL (task_id: ${taskId}, name: ${outputName})`);
   }
 
   const resultData = await resultRes.json();
@@ -413,6 +518,77 @@ export const lightX2VTask = async (
 };
 
 /**
+ * LightX2V Model List Service
+ * Get available model list from LightX2V API
+ */
+export const lightX2VGetModelList = async (
+  baseUrl: string,
+  token: string
+): Promise<Array<{ task: string; model_cls: string; stage: string }>> => {
+  const response = await lightX2VRequest({
+    baseUrl,
+    token,
+    endpoint: '/api/v1/model/list',
+    options: {
+      method: 'GET'
+    },
+    requireToken: true // 使用 apiClient 时不需要 token
+  });
+
+  if (!response.ok) {
+    await handleLightX2VError(response, 'Model List');
+  }
+
+  const data = await response.json();
+  return data.models || [];
+};
+
+/**
+ * Get LightX2V config for a specific model
+ * Returns local or cloud config based on model ID
+ */
+export const getLightX2VConfigForModel = (modelId: string): { url: string; token: string; isCloud: boolean } => {
+  const isCloud = modelId.endsWith('-cloud');
+
+  if (isCloud) {
+    // Cloud model - use cloud config
+    const cloudUrl = (process.env.LIGHTX2V_CLOUD_URL || 'https://x2v.light-ai.top').trim();
+    const cloudToken = (process.env.LIGHTX2V_CLOUD_TOKEN || '').trim();
+
+    if (!cloudToken) {
+      throw new Error('LIGHTX2V_CLOUD_TOKEN 未设置。请设置 LIGHTX2V_CLOUD_TOKEN 环境变量以使用云端模型。');
+    }
+
+    return {
+      url: cloudUrl,
+      token: cloudToken,
+      isCloud: true
+    };
+  } else {
+    // Local model - use local config
+    const envUrl = (process.env.LIGHTX2V_URL || '').trim();
+    const apiClient = (window as any).__API_CLIENT__;
+
+    // Get token from apiClient or environment
+    let token: string;
+    if (!envUrl && apiClient) {
+      // Use apiClient (relative path) - token will be handled by apiClient
+      token = '';
+    } else {
+      // Use direct URL - need token
+      const localToken = localStorage.getItem('accessToken');
+      token = localToken || (process.env.LIGHTX2V_TOKEN || '').trim();
+    }
+
+    return {
+      url: envUrl || '',
+      token: token,
+      isCloud: false
+    };
+  }
+};
+
+/**
  * LightX2V TTS Voice List Service
  * Get available voice list from LightX2V TTS API
  */
@@ -421,40 +597,19 @@ export const lightX2VGetVoiceList = async (
   token: string,
   version: string = "all"
 ): Promise<{ voices?: any[]; emotions?: string[]; languages?: any[] }> => {
-  if (!baseUrl || !baseUrl.trim()) throw new Error("Base URL is required for LightX2V Voice List");
-  if (!token || !token.trim()) throw new Error("Access Token is required for LightX2V Voice List");
-
-  const normalizedBaseUrl = baseUrl.replace(/\/$/, '');
-  const url = `${normalizedBaseUrl}/api/v1/voices/list${version !== "all" ? `?version=${version}` : ''}`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/json'
-    }
+  const endpoint = `/api/v1/voices/list${version !== "all" ? `?version=${version}` : ''}`;
+  const response = await lightX2VRequest({
+    baseUrl,
+    token,
+    endpoint,
+    options: {
+      method: 'GET'
+    },
+    requireToken: false // 使用 apiClient 时不需要 token
   });
 
   if (!response.ok) {
-    let errorMessage = `LightX2V Voice List Failed (${response.status})`;
-    try {
-      const errText = await response.text();
-      if (errText.trim().startsWith('{') || errText.trim().startsWith('[')) {
-        try {
-          const errorData = JSON.parse(errText);
-          errorMessage = errorData.error || errorData.message || errorMessage;
-          if (errorData.detail) errorMessage += `: ${errorData.detail}`;
-        } catch {
-          errorMessage = errText.trim() || errorMessage;
-        }
-      } else {
-        errorMessage = errText.trim() || errorMessage;
-      }
-    } catch (e: any) {
-      errorMessage = e.message || errorMessage;
-    }
-    console.error(`[LightX2V] Voice List error: ${errorMessage}`);
-    throw new Error(errorMessage);
+    await handleLightX2VError(response, 'Voice List');
   }
 
   let result: any;
@@ -523,15 +678,10 @@ export const lightX2VTTS = async (
   loudnessRate: number = 0,
   resourceId: string = "seed-tts-2.0"
 ): Promise<string> => {
-  if (!baseUrl || !baseUrl.trim()) throw new Error("Base URL is required for LightX2V TTS");
-  if (!token || !token.trim()) throw new Error("Access Token is required for LightX2V TTS");
   const textStr = typeof text === 'string' ? text : String(text || '');
   if (!textStr || !textStr.trim()) throw new Error("Text is required for TTS");
   const voiceTypeStr = typeof voiceType === 'string' ? voiceType : String(voiceType || '');
   if (!voiceTypeStr || !voiceTypeStr.trim()) throw new Error("Voice type is required for TTS");
-
-  const normalizedBaseUrl = baseUrl.replace(/\/$/, '');
-  const url = `${normalizedBaseUrl}/api/v1/tts/generate`;
 
   const payload = {
     text: textStr,
@@ -545,90 +695,22 @@ export const lightX2VTTS = async (
     resource_id: resourceId
   };
 
-  const response = await fetch(url, {
+  const response = await lightX2VRequest({
+    baseUrl,
+    token,
+    endpoint: '/api/v1/tts/generate',
+    options: {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/json, audio/*'
+      body: JSON.stringify(payload),
+      accept: 'application/json, audio/*'
     },
-    body: JSON.stringify(payload)
+    requireToken: false // 使用 apiClient 时不需要 token
   });
 
-  // Check response status
   const contentType = response.headers.get("Content-Type") || "";
 
   if (!response.ok) {
-    // Try to parse error response - read response body only once
-    let errorMessage = `LightX2V TTS Failed (${response.status})`;
-    let errorDetails: any = null;
-    try {
-      // Read response body as text first (works for both JSON and plain text)
-      const errorText = await response.text();
-      
-      // Try to parse as JSON
-      if (errorText.trim().startsWith('{') || errorText.trim().startsWith('[')) {
-        try {
-          errorDetails = JSON.parse(errorText);
-          errorMessage = errorDetails.error || errorDetails.message || errorMessage;
-          
-          // Include additional error details if available
-          if (errorDetails.detail) {
-            errorMessage += `: ${errorDetails.detail}`;
-          } else if (errorDetails.errors) {
-            // Handle validation errors array
-            const errorDetailsList = Array.isArray(errorDetails.errors) 
-              ? errorDetails.errors.map((e: any) => e.msg || e.message || e).join(', ')
-              : errorDetails.errors;
-            errorMessage += `: ${errorDetailsList}`;
-          } else if (errorDetails.traceback || errorDetails.stack) {
-            // Include traceback/stack if available (truncated)
-            const traceback = errorDetails.traceback || errorDetails.stack;
-            const shortTraceback = typeof traceback === 'string' 
-              ? traceback.split('\n').slice(0, 3).join(' | ')
-              : String(traceback).substring(0, 200);
-            errorMessage += ` (${shortTraceback})`;
-          }
-        } catch (parseError) {
-          // Not valid JSON, use text as-is
-          errorMessage = errorText.trim() || errorMessage;
-          errorDetails = { raw: errorText };
-        }
-      } else {
-        // Plain text error
-        errorMessage = errorText.trim() || errorMessage;
-        errorDetails = { raw: errorText };
-      }
-    } catch (error: any) {
-      // If reading response fails, use error message or default
-      errorMessage = error.message || errorMessage;
-      errorDetails = { readError: error.message };
-    }
-    
-    // Log detailed error information for debugging
-    console.error(`[LightX2V] TTS error: ${errorMessage}`, { 
-      voiceType, 
-      text: text?.substring(0, 50), 
-      status: response.status,
-      url: url,
-      errorDetails: errorDetails,
-      payload: {
-        voice_type: voiceType,
-        resource_id: resourceId,
-        emotion: emotion || '(none)',
-        emotion_scale: emotionScale,
-        speech_rate: speechRate,
-        pitch: pitch,
-        loudness_rate: loudnessRate
-      }
-    });
-    
-    // Enhance error message with context if it's still generic
-    if (errorMessage === 'TTS generation failed' || errorMessage.includes('TTS generation failed')) {
-      errorMessage = `TTS generation failed (HTTP ${response.status}). Voice: ${voiceType}, Resource: ${resourceId}. ${errorDetails?.detail || errorDetails?.message || 'Please check server logs for details.'}`;
-    }
-    
-    throw new Error(errorMessage);
+    await handleLightX2VError(response, 'TTS');
   }
 
   // Check if response is audio or JSON error
@@ -682,13 +764,8 @@ export const lightX2VVoiceClone = async (
   audioBase64: string,
   text?: string
 ): Promise<string> => {
-  if (!baseUrl || !baseUrl.trim()) throw new Error("Base URL is required for LightX2V Voice Clone");
-  if (!token || !token.trim()) throw new Error("Access Token is required for LightX2V Voice Clone");
   if (!audioBase64) throw new Error("Audio file is required for voice cloning");
 
-  const normalizedBaseUrl = baseUrl.replace(/\/$/, '');
-  const url = `${normalizedBaseUrl}/api/v1/voice/clone`;
-  
   // Convert base64 to blob
   const base64Data = audioBase64.includes(',') ? audioBase64.split(',')[1] : audioBase64;
   const byteCharacters = atob(base64Data);
@@ -698,42 +775,26 @@ export const lightX2VVoiceClone = async (
   }
   const byteArray = new Uint8Array(byteNumbers);
   const blob = new Blob([byteArray], { type: 'audio/wav' });
-  
+
   const formData = new FormData();
   formData.append('file', blob, 'audio.wav');
   if (text) {
     formData.append('text', text);
   }
 
-  const response = await fetch(url, {
+  const response = await lightX2VRequest({
+    baseUrl,
+    token,
+    endpoint: '/api/v1/voice/clone',
+    options: {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/json'
-    },
     body: formData
+    },
+    requireToken: false // 使用 apiClient 时不需要 token
   });
 
   if (!response.ok) {
-    let errorMessage = `LightX2V Voice Clone Failed (${response.status})`;
-    try {
-    const errText = await response.text();
-      if (errText.trim().startsWith('{') || errText.trim().startsWith('[')) {
-        try {
-          const errorData = JSON.parse(errText);
-          errorMessage = errorData.error || errorData.message || errorMessage;
-          if (errorData.detail) errorMessage += `: ${errorData.detail}`;
-        } catch {
-          errorMessage = errText.trim() || errorMessage;
-        }
-      } else {
-        errorMessage = errText.trim() || errorMessage;
-      }
-    } catch (e: any) {
-      errorMessage = e.message || errorMessage;
-    }
-    console.error(`[LightX2V] Voice Clone error: ${errorMessage}`);
-    throw new Error(errorMessage);
+    await handleLightX2VError(response, 'Voice Clone');
   }
 
   const result = await response.json();
@@ -764,15 +825,11 @@ export const lightX2VVoiceCloneTTS = async (
   pitch: number = 0,
   language: string = "ZH_CN"
 ): Promise<string> => {
-  if (!baseUrl || !baseUrl.trim()) throw new Error("Base URL is required for LightX2V Voice Clone TTS");
-  if (!token || !token.trim()) throw new Error("Access Token is required for LightX2V Voice Clone TTS");
   const speakerIdStr = typeof speakerId === 'string' ? speakerId : String(speakerId || '');
   if (!speakerIdStr || !speakerIdStr.trim()) throw new Error("Speaker ID is required for TTS with cloned voice");
   const textStr = typeof text === 'string' ? text : String(text || '');
   if (!textStr || !textStr.trim()) throw new Error("Text is required for TTS");
 
-  const normalizedBaseUrl = baseUrl.replace(/\/$/, '');
-  const url = `${normalizedBaseUrl}/api/v1/voice/clone/tts`;
   const payload = {
     text: textStr,
     speaker_id: speakerIdStr,
@@ -783,36 +840,20 @@ export const lightX2VVoiceCloneTTS = async (
     language: language
   };
 
-  const response = await fetch(url, {
+  const response = await lightX2VRequest({
+    baseUrl,
+    token,
+    endpoint: '/api/v1/voice/clone/tts',
+    options: {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/json, audio/*'
+      body: JSON.stringify(payload),
+      accept: 'application/json, audio/*'
     },
-    body: JSON.stringify(payload)
+    requireToken: false // 使用 apiClient 时不需要 token
   });
 
   if (!response.ok) {
-    let errorMessage = `LightX2V Voice Clone TTS Failed (${response.status})`;
-    try {
-    const errText = await response.text();
-      if (errText.trim().startsWith('{') || errText.trim().startsWith('[')) {
-        try {
-          const errorData = JSON.parse(errText);
-          errorMessage = errorData.error || errorData.message || errorMessage;
-          if (errorData.detail) errorMessage += `: ${errorData.detail}`;
-        } catch {
-          errorMessage = errText.trim() || errorMessage;
-        }
-      } else {
-        errorMessage = errText.trim() || errorMessage;
-      }
-    } catch (e: any) {
-      errorMessage = e.message || errorMessage;
-    }
-    console.error(`[LightX2V] Voice Clone TTS error: ${errorMessage}`, { speakerId, text: text?.substring(0, 50) });
-    throw new Error(errorMessage);
+    await handleLightX2VError(response, 'Voice Clone TTS');
   }
 
   // Check if response is audio or JSON error
@@ -845,50 +886,24 @@ export const lightX2VGetCloneVoiceList = async (
   baseUrl: string,
   token: string
 ): Promise<any[]> => {
-  if (!baseUrl || !baseUrl.trim()) throw new Error("Base URL is required for LightX2V Clone Voice List");
-  if (!token || !token.trim()) throw new Error("Access Token is required for LightX2V Clone Voice List");
-
-  const normalizedBaseUrl = baseUrl.replace(/\/$/, '');
-  const url = `${normalizedBaseUrl}/api/v1/voice/clone/list`;
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/json'
-    }
+  const response = await lightX2VRequest({
+    baseUrl,
+    token,
+    endpoint: '/api/v1/voice/clone/list',
+    options: {
+      method: 'GET'
+    },
+    requireToken: false // 使用 apiClient 时不需要 token
   });
 
   if (!response.ok) {
-    let errorMessage = `LightX2V Clone Voice List Failed (${response.status})`;
-    let errorDetails: any = null;
-    try {
-      const errText = await response.text();
-      if (errText.trim().startsWith('{') || errText.trim().startsWith('[')) {
-        try {
-          errorDetails = JSON.parse(errText);
-          errorMessage = errorDetails.error || errorDetails.message || errorMessage;
-          if (errorDetails.detail) errorMessage += `: ${errorDetails.detail}`;
-        } catch (parseError) {
-          errorMessage = errText.trim() || errorMessage;
-          errorDetails = { raw: errText };
-        }
-      } else {
-        errorMessage = errText.trim() || errorMessage;
-        errorDetails = { raw: errText };
-      }
-    } catch (e: any) {
-      errorMessage = e.message || errorMessage;
-      errorDetails = { readError: e.message };
-    }
-    console.error(`[LightX2V] Clone Voice List error: ${errorMessage}`, { status: response.status, url, errorDetails });
-    throw new Error(errorMessage);
+    await handleLightX2VError(response, 'Clone Voice List');
   }
 
   const result = await response.json();
   try {
     let voices: any[] = [];
-    
+
     // Check different possible response structures
     if (Array.isArray(result)) {
       // Direct array response
@@ -903,15 +918,15 @@ export const lightX2VGetCloneVoiceList = async (
       // Response with data field (fallback)
       voices = result.data;
     }
-    
-    console.log(`[LightX2V] Clone voice list parsed:`, { 
-      resultType: Array.isArray(result) ? 'array' : typeof result, 
+
+    console.log(`[LightX2V] Clone voice list parsed:`, {
+      resultType: Array.isArray(result) ? 'array' : typeof result,
       hasVoiceClones: !!result.voice_clones,
       hasVoices: !!result.voices,
       voicesCount: voices.length,
-      voices 
+      voices
     });
-    
+
     return voices;
   } catch (typeError: any) {
     console.error(`[LightX2V] Type error processing clone voice list:`, typeError, result);
@@ -929,7 +944,8 @@ export const deepseekText = async (
   customInstruction?: string,
   model = 'deepseek-v3-2-251201',
   outputFields?: OutputField[],
-  useSearch = false
+  useSearch = false,
+  returnRaw = false
 ): Promise<any> => {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
@@ -949,8 +965,8 @@ export const deepseekText = async (
     polish: "Refine text for clarity and tone.",
   };
 
-  const baseInstruction = mode === 'custom' && customInstruction 
-    ? customInstruction 
+  const baseInstruction = mode === 'custom' && customInstruction
+    ? customInstruction
     : (systemInstructions[mode] || systemInstructions.basic);
 
   const hasMultipleOutputs = outputFields && outputFields.length > 0;
@@ -958,12 +974,12 @@ export const deepseekText = async (
 
   // Build input array with user content
   const inputContent: any[] = [];
-  
+
   // Add text content
   const textContent = hasMultipleOutputs
     ? `${promptStr}\n\nIMPORTANT: You MUST generate content for each field as JSON: ${outputKeys.join(', ')}.`
     : promptStr;
-  
+
   inputContent.push({
     type: 'input_text',
     text: textContent
@@ -1032,7 +1048,7 @@ export const deepseekText = async (
   if (useSearch) {
     console.log('[DeepSeek] Full API response:', JSON.stringify(data, null, 2));
   }
-  
+
   // New API format: response.output is an array, find the message type item
   // The message item has content array with type: "output_text"
   let text = "";
@@ -1041,7 +1057,7 @@ export const deepseekText = async (
     const messageOutputs = data.output.filter((item: any) => item.type === "message");
     // Use the last message output (final answer)
     const messageOutput = messageOutputs.length > 0 ? messageOutputs[messageOutputs.length - 1] : null;
-    
+
     if (messageOutput && messageOutput.content && Array.isArray(messageOutput.content)) {
       // Find all output_text items and concatenate them
       const textContents = messageOutput.content.filter((item: any) => item.type === "output_text");
@@ -1053,7 +1069,7 @@ export const deepseekText = async (
         }
       }
     }
-    
+
     // Debug log if text is empty
     if (!text) {
       console.warn('[DeepSeek] Failed to extract text from response:', JSON.stringify(data, null, 2));
@@ -1074,7 +1090,9 @@ export const deepseekText = async (
         // If hasMultipleOutputs is true, return the JSON object (already in correct format)
         if (hasMultipleOutputs) {
           outputKeys.forEach(key => { if (!(key in extractedJson)) extractedJson[key] = "..."; });
-          return extractedJson;
+          return returnRaw
+            ? { data: extractedJson, raw_response: data, usage: data.usage || {}, finish_reason: data.finish_reason || '' }
+            : extractedJson;
         }
         // If hasMultipleOutputs is false but JSON contains output fields, extract the first value
         // This handles cases where API returns { "out-text": "..." } but we want just the text
@@ -1084,10 +1102,14 @@ export const deepseekText = async (
         }
         // If it matches expected output keys, extract the value
         if (outputKeys.length === 1 && outputKeys[0] in extractedJson) {
-          return extractedJson[outputKeys[0]];
+          return returnRaw
+            ? { data: extractedJson[outputKeys[0]], raw_response: data, usage: data.usage || {}, finish_reason: data.finish_reason || '' }
+            : extractedJson[outputKeys[0]];
         }
         // Otherwise return the parsed JSON
-        return extractedJson;
+        return returnRaw
+          ? { data: extractedJson, raw_response: data, usage: data.usage || {}, finish_reason: data.finish_reason || '' }
+          : extractedJson;
       } catch (e) {
         console.warn('[DeepSeek] Failed to parse JSON from code block:', e);
         // Fall through to normal processing
@@ -1099,15 +1121,21 @@ export const deepseekText = async (
     try {
       const parsed = JSON.parse(text);
       outputKeys.forEach(key => { if (!(key in parsed)) parsed[key] = "..."; });
-      return parsed;
+      return returnRaw
+        ? { data: parsed, raw_response: data, usage: data.usage || {}, finish_reason: data.finish_reason || '' }
+        : parsed;
     } catch (e) {
       const fallback: Record<string, string> = {};
       outputKeys.forEach((key, i) => fallback[key] = i === 0 ? text : "...");
-      return fallback;
+      return returnRaw
+        ? { data: fallback, raw_response: data, usage: data.usage || {}, finish_reason: data.finish_reason || '' }
+        : fallback;
     }
   }
 
-  return text;
+  return returnRaw
+    ? { data: text, raw_response: data, usage: data.usage || {}, finish_reason: data.finish_reason || '' }
+    : text;
 };
 
 /**
@@ -1121,7 +1149,8 @@ export const doubaoText = async (
   model = 'doubao-seed-1-6-vision-250815',
   outputFields?: OutputField[],
   imageInput?: string | string[] | any[],
-  useSearch = false
+  useSearch = false,
+  returnRaw = false
 ): Promise<any> => {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
@@ -1141,8 +1170,8 @@ export const doubaoText = async (
     polish: "Refine text for clarity and tone.",
   };
 
-  const baseInstruction = mode === 'custom' && customInstruction 
-    ? customInstruction 
+  const baseInstruction = mode === 'custom' && customInstruction
+    ? customInstruction
     : (systemInstructions[mode] || systemInstructions.basic);
 
   const hasMultipleOutputs = outputFields && outputFields.length > 0;
@@ -1150,7 +1179,7 @@ export const doubaoText = async (
 
   // Build input content array - support both text and images
   const inputContent: any[] = [];
-  
+
   // Add images if provided
   if (imageInput) {
     const images = Array.isArray(imageInput) ? imageInput : [imageInput];
@@ -1159,7 +1188,7 @@ export const doubaoText = async (
       // Doubao API format: { "type": "input_image", "image_url": "https://..." or "data:image/..." }
       // For HTTP URLs, use directly; for base64/data URLs, use data URL format
       let imageUrl: string;
-      
+
       if (img.startsWith('http://') || img.startsWith('https://')) {
         // HTTP/HTTPS URLs: use directly
         imageUrl = img;
@@ -1182,17 +1211,17 @@ export const doubaoText = async (
       });
     }
   }
-  
+
   // Add text content
   const textContent = hasMultipleOutputs
     ? `${promptStr}\n\nIMPORTANT: You MUST generate content for each field as JSON: ${outputKeys.join(', ')}.`
     : promptStr;
-  
+
   inputContent.push({
     type: 'input_text',
     text: textContent
   });
-  
+
   // Build request body for new responses API
   const requestBody: any = {
     model: model,
@@ -1256,7 +1285,7 @@ export const doubaoText = async (
   if (useSearch) {
     console.log('[Doubao] Full API response:', JSON.stringify(data, null, 2));
   }
-  
+
   // New API format: response.output is an array, find the message type item
   // The message item has content array with type: "output_text"
   let text = "";
@@ -1265,7 +1294,7 @@ export const doubaoText = async (
     const messageOutputs = data.output.filter((item: any) => item.type === "message");
     // Use the last message output (final answer)
     const messageOutput = messageOutputs.length > 0 ? messageOutputs[messageOutputs.length - 1] : null;
-    
+
     if (messageOutput && messageOutput.content && Array.isArray(messageOutput.content)) {
       // Find all output_text items and concatenate them
       const textContents = messageOutput.content.filter((item: any) => item.type === "output_text");
@@ -1277,7 +1306,7 @@ export const doubaoText = async (
         }
       }
     }
-    
+
     // Debug log if text is empty
     if (!text) {
       console.warn('[Doubao] Failed to extract text from response:', JSON.stringify(data, null, 2));
@@ -1298,7 +1327,9 @@ export const doubaoText = async (
         // If hasMultipleOutputs is true, return the JSON object (already in correct format)
         if (hasMultipleOutputs) {
           outputKeys.forEach(key => { if (!(key in extractedJson)) extractedJson[key] = "..."; });
-          return extractedJson;
+          return returnRaw
+            ? { data: extractedJson, raw_response: data, usage: data.usage || {}, finish_reason: data.finish_reason || '' }
+            : extractedJson;
         }
         // If hasMultipleOutputs is false but JSON contains output fields, extract the first value
         // This handles cases where API returns { "out-text": "..." } but we want just the text
@@ -1308,10 +1339,14 @@ export const doubaoText = async (
         }
         // If it matches expected output keys, extract the value
         if (outputKeys.length === 1 && outputKeys[0] in extractedJson) {
-          return extractedJson[outputKeys[0]];
+          return returnRaw
+            ? { data: extractedJson[outputKeys[0]], raw_response: data, usage: data.usage || {}, finish_reason: data.finish_reason || '' }
+            : extractedJson[outputKeys[0]];
         }
         // Otherwise return the parsed JSON
-        return extractedJson;
+        return returnRaw
+          ? { data: extractedJson, raw_response: data, usage: data.usage || {}, finish_reason: data.finish_reason || '' }
+          : extractedJson;
       } catch (e) {
         console.warn('[Doubao] Failed to parse JSON from code block:', e);
         // Fall through to normal processing
@@ -1323,15 +1358,21 @@ export const doubaoText = async (
     try {
       const parsed = JSON.parse(text);
       outputKeys.forEach(key => { if (!(key in parsed)) parsed[key] = "..."; });
-      return parsed;
+      return returnRaw
+        ? { data: parsed, raw_response: data, usage: data.usage || {}, finish_reason: data.finish_reason || '' }
+        : parsed;
     } catch (e) {
       const fallback: Record<string, string> = {};
       outputKeys.forEach((key, i) => fallback[key] = i === 0 ? text : "...");
-      return fallback;
+      return returnRaw
+        ? { data: fallback, raw_response: data, usage: data.usage || {}, finish_reason: data.finish_reason || '' }
+        : fallback;
     }
   }
 
-  return text;
+  return returnRaw
+    ? { data: text, raw_response: data, usage: data.usage || {}, finish_reason: data.finish_reason || '' }
+    : text;
 };
 
 /**
@@ -1365,8 +1406,8 @@ export const ppchatGeminiText = async (
     polish: "Refine text for clarity and tone.",
   };
 
-  const baseInstruction = mode === 'custom' && customInstruction 
-    ? customInstruction 
+  const baseInstruction = mode === 'custom' && customInstruction
+    ? customInstruction
     : (systemInstructions[mode] || systemInstructions.basic);
 
   const hasMultipleOutputs = outputFields && outputFields.length > 0;
@@ -1528,7 +1569,7 @@ export const ppchatChatCompletions = async (
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${apiKey}`
   };
-  
+
   // 如果有 Cookie，添加到 headers
   if (cookieValue) {
     headers['Cookie'] = cookieValue;
@@ -1553,10 +1594,10 @@ export const ppchatChatCompletions = async (
   }
 
   const data = await response.json();
-  
+
   // 提取 content 从 OpenAI 格式的响应
   const content = data.choices?.[0]?.message?.content || '';
-  
+
   if (!content) {
     throw new Error('Empty response from PP Chat API');
   }
@@ -1574,21 +1615,118 @@ export const deepseekChat = async (
   responseFormat: 'json_object' | 'text' = 'json_object'
 ): Promise<string> => {
   const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) {
+
+  if (!apiKey || !apiKey.trim()) {
     throw new Error("DeepSeek API key is required. Please set DEEPSEEK_API_KEY environment variable.");
+  }
+
+  console.log('deepseekChat messages:', messages);
+
+  // 转换为 Responses API 格式
+  // 根据文档：
+  // - 当使用 text 参数时，input 中的 content 应该是字符串
+  // - 当不使用 text 参数时，input 中的 content 应该是数组 [{ type: "input_text", text: "..." }]
+  const inputList: any[] = [];
+  const useTextParam = responseFormat === 'json_object';
+
+  for (const msg of messages) {
+    const role = msg.role;
+    const content = msg.content;
+
+    // 跳过空内容的消息
+    if (!content || (typeof content === 'string' && content.trim() === '') ||
+        (Array.isArray(content) && content.length === 0)) {
+      continue;
+    }
+
+    if (useTextParam) {
+      // 使用 text 参数时，content 直接是字符串
+      let textContent: string;
+      if (typeof content === 'string') {
+        textContent = content.trim();
+      } else if (Array.isArray(content)) {
+        // 从数组中提取文本内容（忽略图片等其他类型）
+        const textItems = (content as any[]).filter((item: any) => item.type === 'input_text');
+        textContent = textItems.map((item: any) => item.text || '').join(' ').trim();
+        // 如果没有文本内容，跳过这条消息
+        if (!textContent) {
+          continue;
+        }
+      } else {
+        textContent = String(content).trim();
+      }
+
+      // 确保 content 不为空
+      if (!textContent) {
+        continue;
+      }
+
+      inputList.push({
+        role: role,
+        content: textContent
+      });
+    } else {
+      // 不使用 text 参数时，使用数组格式
+      let contentList: any[];
+      if (typeof content === 'string') {
+        const trimmedContent = content.trim();
+        if (!trimmedContent) {
+          continue;
+        }
+        contentList = [{ type: 'input_text', text: trimmedContent }];
+      } else if (Array.isArray(content)) {
+        // 过滤掉空内容
+        contentList = (content as any[]).filter((item: any) => {
+          if (item.type === 'input_text') {
+            return item.text && item.text.trim();
+          }
+          return true; // 保留非文本类型（如图片）
+        });
+        if (contentList.length === 0) {
+          continue;
+        }
+      } else {
+        const strContent = String(content).trim();
+        if (!strContent) {
+          continue;
+        }
+        contentList = [{ type: 'input_text', text: strContent }];
+      }
+
+      inputList.push({
+        role: role,
+        content: contentList
+      });
+    }
+  }
+
+  // 确保至少有一条消息
+  if (inputList.length === 0) {
+    throw new Error('No valid messages to send');
   }
 
   const requestBody: any = {
     model: model,
-    messages: messages
+    stream: false
   };
 
-  // Add response format for JSON mode
-  if (responseFormat === 'json_object') {
-    requestBody.response_format = { type: 'json_object' };
+  // 根据文档，如果只有一条 user 消息且没有 system 消息，可以直接使用字符串
+  // 否则使用数组格式
+  if (inputList.length === 1 && inputList[0].role === 'user' && useTextParam) {
+    requestBody.input = inputList[0].content; // 直接使用字符串
+  } else {
+    requestBody.input = inputList; // 使用数组格式
   }
 
-  const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/chat/completions', {
+  // 结构化输出通过顶层的 text 参数传递
+  if (useTextParam) {
+    requestBody.text = { format: { type: 'json_object' } };
+  }
+
+  // 调试日志
+  console.log('[DeepSeek Chat] Request body:', JSON.stringify(requestBody, null, 2));
+
+  const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/responses', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -1598,7 +1736,7 @@ export const deepseekChat = async (
   });
 
   if (!response.ok) {
-    let errorMessage = `DeepSeek Chat API failed (${response.status})`;
+    let errorMessage = `DeepSeek Responses API failed (${response.status})`;
     try {
       const errorData = await response.json();
       errorMessage = errorData.error?.message || errorData.error || errorMessage;
@@ -1610,13 +1748,414 @@ export const deepseekChat = async (
   }
 
   const data = await response.json();
-  
-  // Extract content from response
-  const content = data.choices?.[0]?.message?.content || '';
-  
-  if (!content) {
-    throw new Error('Empty response from DeepSeek Chat API');
+  console.log('deepseekChat data:', data);
+
+  // Extract content from Responses API format
+  let text = '';
+  if (data.output && Array.isArray(data.output)) {
+    // 查找所有 message 类型的输出
+    const messageOutputs = data.output.filter((item: any) => item.type === 'message');
+
+    // 使用最后一个 message 输出（通常是最终答案）
+    if (messageOutputs.length > 0) {
+      const messageOutput = messageOutputs[messageOutputs.length - 1];
+      const content = messageOutput.content || [];
+
+      if (Array.isArray(content)) {
+        // 查找所有 output_text 类型的内容
+        const textContents = content.filter((item: any) => item.type === 'output_text');
+        if (textContents.length > 0) {
+          // 拼接所有文本内容
+          text = textContents.map((item: any) => item.text || '').join('');
+        }
+      }
+    }
   }
 
-  return content;
+  // 向后兼容：尝试旧格式
+  if (!text) {
+    text = data.output?.[0]?.content?.[0]?.text || data.choices?.[0]?.message?.content || '';
+  }
+
+  if (!text) {
+    throw new Error('Empty response from DeepSeek Responses API');
+  }
+
+  return text;
 };
+
+/**
+ * DeepSeek Chat Completions API with streaming support
+ * Returns an async generator that yields chunks of the response
+ */
+export async function* deepseekChatStream(
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+  model = 'deepseek-v3-2-251201',
+  responseFormat: 'json_object' | 'text' = 'json_object'
+): AsyncGenerator<{ type: 'thinking' | 'content'; text: string }, void, unknown> {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+
+  if (!apiKey || !apiKey.trim()) {
+    throw new Error("DeepSeek API key is required. Please set DEEPSEEK_API_KEY environment variable.");
+  }
+
+  // 转换为 Responses API 格式
+  // 根据文档：
+  // - 当使用 text 参数时，input 中的 content 应该是字符串
+  // - 当不使用 text 参数时，input 中的 content 应该是数组 [{ type: "input_text", text: "..." }]
+  const inputList: any[] = [];
+  const useTextParam = responseFormat === 'json_object';
+
+  for (const msg of messages) {
+    const role = msg.role;
+    const content = msg.content;
+
+    // 跳过空内容的消息
+    if (!content || (typeof content === 'string' && content.trim() === '') ||
+        (Array.isArray(content) && content.length === 0)) {
+      continue;
+    }
+
+    if (useTextParam) {
+      // 使用 text 参数时，content 直接是字符串
+      let textContent: string;
+      if (typeof content === 'string') {
+        textContent = content.trim();
+      } else if (Array.isArray(content)) {
+        // 从数组中提取文本内容（忽略图片等其他类型）
+        const textItems = (content as any[]).filter((item: any) => item.type === 'input_text');
+        textContent = textItems.map((item: any) => item.text || '').join(' ').trim();
+        // 如果没有文本内容，跳过这条消息
+        if (!textContent) {
+          continue;
+        }
+      } else {
+        textContent = String(content).trim();
+      }
+
+      // 确保 content 不为空
+      if (!textContent) {
+        continue;
+      }
+
+      inputList.push({
+        role: role,
+        content: textContent
+      });
+    } else {
+      // 不使用 text 参数时，使用数组格式
+      let contentList: any[];
+      if (typeof content === 'string') {
+        const trimmedContent = content.trim();
+        if (!trimmedContent) {
+          continue;
+        }
+        contentList = [{ type: 'input_text', text: trimmedContent }];
+      } else if (Array.isArray(content)) {
+        // 过滤掉空内容
+        contentList = (content as any[]).filter((item: any) => {
+          if (item.type === 'input_text') {
+            return item.text && item.text.trim();
+          }
+          return true; // 保留非文本类型（如图片）
+        });
+        if (contentList.length === 0) {
+          continue;
+        }
+      } else {
+        const strContent = String(content).trim();
+        if (!strContent) {
+          continue;
+        }
+        contentList = [{ type: 'input_text', text: strContent }];
+      }
+
+      inputList.push({
+        role: role,
+        content: contentList
+      });
+    }
+  }
+
+  // 确保至少有一条消息
+  if (inputList.length === 0) {
+    throw new Error('No valid messages to send');
+  }
+
+  const requestBody: any = {
+    model: model,
+    stream: true,
+    thinking: { type: 'enabled' } // 启用思考过程
+  };
+
+  // 根据文档，如果只有一条 user 消息且没有 system 消息，可以直接使用字符串
+  // 否则使用数组格式
+  if (inputList.length === 1 && inputList[0].role === 'user' && useTextParam) {
+    requestBody.input = inputList[0].content; // 直接使用字符串
+  } else {
+    requestBody.input = inputList; // 使用数组格式
+  }
+
+  // 结构化输出通过顶层的 text 参数传递
+  if (useTextParam) {
+    requestBody.text = { format: { type: 'json_object' } };
+  }
+
+  // 调试日志
+  console.log('[DeepSeek Chat Stream] Request body:', JSON.stringify(requestBody, null, 2));
+
+  const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/responses', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!response.ok) {
+    let errorMessage = `DeepSeek Responses API failed (${response.status})`;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.error?.message || errorData.error || errorMessage;
+    } catch (e) {
+      const errorText = await response.text();
+      errorMessage = errorText || errorMessage;
+    }
+    throw new Error(errorMessage);
+  }
+
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder();
+
+  if (!reader) {
+    throw new Error('Failed to get response reader');
+  }
+
+  let buffer = '';
+  let currentEvent: string | null = null;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmedLine = line.trim();
+
+        if (trimmedLine === '') {
+          // 空行表示一个事件结束，重置 currentEvent
+          currentEvent = null;
+          continue;
+        }
+
+        // 解析 SSE 格式：event: xxx 和 data: {...}
+        if (trimmedLine.startsWith('event: ')) {
+          currentEvent = trimmedLine.slice(7).trim();
+          continue;
+        }
+
+        if (trimmedLine.startsWith('data: ')) {
+          const dataStr = trimmedLine.slice(6);
+          if (dataStr === '[DONE]') {
+            return;
+          }
+
+          try {
+            const data = JSON.parse(dataStr);
+
+            // 根据事件类型处理（优先使用 currentEvent，如果没有则使用 data.type）
+            const eventType = currentEvent || data.type;
+
+            // 处理思考过程的增量文本
+            if (eventType === 'response.reasoning_summary_text.delta') {
+              if (data.delta) {
+                yield { type: 'thinking', text: data.delta };
+              }
+            }
+            // 处理消息内容的增量文本
+            else if (eventType === 'response.message_text.delta') {
+              if (data.delta) {
+                yield { type: 'content', text: data.delta };
+              }
+            }
+            // 处理其他可能包含文本的事件
+            else if (data.delta && typeof data.delta === 'string') {
+              // 如果有 delta 字段，尝试根据上下文判断类型
+              if (eventType?.includes('reasoning') || eventType?.includes('thinking')) {
+                yield { type: 'thinking', text: data.delta };
+              } else {
+                yield { type: 'content', text: data.delta };
+              }
+            }
+            // 向后兼容：尝试解析 output 数组格式
+            else if (data.output && Array.isArray(data.output)) {
+              for (const outputItem of data.output) {
+                if (outputItem.type === 'reasoning' || outputItem.type === 'thinking') {
+                  const content = outputItem.content || [];
+                  if (Array.isArray(content)) {
+                    const textContents = content.filter((item: any) => item.type === 'output_text');
+                    for (const textItem of textContents) {
+                      if (textItem.text) {
+                        yield { type: 'thinking', text: textItem.text };
+                      }
+                    }
+                  }
+                } else if (outputItem.type === 'message') {
+                  const content = outputItem.content || [];
+                  if (Array.isArray(content)) {
+                    const textContents = content.filter((item: any) => item.type === 'output_text');
+                    for (const textItem of textContents) {
+                      if (textItem.text) {
+                        yield { type: 'content', text: textItem.text };
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            // 向后兼容：尝试旧格式（chat/completions 格式）
+            else {
+              const choice = data.choices?.[0];
+              const delta = choice?.delta;
+
+              if (delta) {
+                const isThinkingChunk = choice?.type === 'thinking' || delta.type === 'thinking';
+
+                if (isThinkingChunk) {
+                  const thinkingContent = delta.content || delta.text || delta.thinking || '';
+                  if (thinkingContent) {
+                    yield { type: 'thinking', text: thinkingContent };
+                  }
+                } else if (delta.thinking !== undefined && delta.thinking !== null && delta.thinking !== '') {
+                  yield { type: 'thinking', text: delta.thinking };
+                }
+
+                if (!isThinkingChunk) {
+                  const content = delta.content || '';
+                  if (content) {
+                    yield { type: 'content', text: content };
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            // Skip invalid JSON
+            console.warn('Failed to parse SSE data:', dataStr, e);
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+/**
+ * PP Chat Completions API with streaming support
+ */
+export async function* ppchatChatCompletionsStream(
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+  model = 'gemini-3-pro-preview',
+  responseFormat: 'json_object' | 'text' = 'json_object'
+): AsyncGenerator<{ type: 'thinking' | 'content'; text: string }, void, unknown> {
+  const apiKey = process.env.PPCHAT_API_KEY;
+  if (!apiKey) {
+    throw new Error("PP Chat API key is required. Please set PPCHAT_API_KEY environment variable.");
+  }
+
+  const formattedMessages = messages.map(msg => ({
+    role: msg.role,
+    content: msg.content
+  }));
+
+  const requestBody: any = {
+    model: model,
+    stream: true,
+    messages: formattedMessages
+  };
+
+  if (responseFormat === 'json_object') {
+    requestBody.response_format = { type: 'json_object' };
+  }
+
+  const cookieValue = process.env.PPCHAT_COOKIE || '';
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${apiKey}`
+  };
+
+  if (cookieValue) {
+    headers['Cookie'] = cookieValue;
+  }
+
+  const response = await fetch('https://api.ppchat.vip/v1/chat/completions', {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!response.ok) {
+    let errorMessage = `PP Chat API failed (${response.status})`;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.error?.message || errorData.error || errorMessage;
+    } catch (e) {
+      const errorText = await response.text();
+      errorMessage = errorText || errorMessage;
+    }
+    throw new Error(errorMessage);
+  }
+
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder();
+
+  if (!reader) {
+    throw new Error('Failed to get response reader');
+  }
+
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.trim() === '') continue;
+        if (line.startsWith('data: ')) {
+          const dataStr = line.slice(6);
+          if (dataStr === '[DONE]') {
+            return;
+          }
+
+          try {
+            const data = JSON.parse(dataStr);
+            const delta = data.choices?.[0]?.delta;
+            if (delta) {
+              const content = delta.content || '';
+              if (content) {
+                yield { type: 'content', text: content };
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to parse SSE data:', dataStr);
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}

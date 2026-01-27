@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ChevronLeft,
   ZoomIn,
@@ -14,11 +14,18 @@ import {
   RefreshCw,
   Zap,
   Undo,
-  Redo
+  Redo,
+  LayoutGrid,
+  Github,
+  Hash,
+  Square,
+  Lock,
+  Globe
 } from 'lucide-react';
 import { WorkflowState } from '../../../types';
 import { useTranslation, Language } from '../../i18n/useTranslation';
 import { formatTime } from '../../utils/format';
+import { UserCard } from '../common/UserCard';
 
 interface ViewState {
   x: number;
@@ -33,6 +40,7 @@ interface EditorHeaderProps {
   selectedRunId: string | null;
   isPaused: boolean;
   isRunning: boolean;
+  isSaving?: boolean;
   canvasRef: React.RefObject<HTMLDivElement>;
   onBack: () => void;
   onWorkflowNameChange: (name: string) => void;
@@ -44,10 +52,12 @@ interface EditorHeaderProps {
   onSave: () => void;
   onPause: () => void;
   onRun: () => void;
+  onStop: () => void;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
+  onVisibilityChange: (isPublic: boolean) => void;
 }
 
 export const EditorHeader: React.FC<EditorHeaderProps> = ({
@@ -57,6 +67,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
   selectedRunId,
   isPaused,
   isRunning,
+  isSaving = false,
   canvasRef,
   onBack,
   onWorkflowNameChange,
@@ -68,19 +79,100 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
   onSave,
   onPause,
   onRun,
+  onStop,
   canUndo,
   canRedo,
   onUndo,
-  onRedo
+  onRedo,
+  onVisibilityChange
 }) => {
   const { t } = useTranslation(lang);
+  const [user, setUser] = useState<any>(null);
+  const isPublic = workflow.visibility === 'public';
+
+  // 获取用户信息
+  useEffect(() => {
+    const sharedStore = (window as any).__SHARED_STORE__;
+
+    // 初始化用户信息
+    if (sharedStore) {
+      const currentUser = sharedStore.getState('user');
+      setUser(currentUser);
+
+      // 订阅用户状态变化
+      const unsubscribe = sharedStore.subscribe((state: any) => {
+        setUser(state.user);
+      });
+
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
+    } else {
+      // 如果没有 sharedStore，从 localStorage 读取
+      try {
+        const userStr = localStorage.getItem('currentUser');
+        if (userStr) {
+          setUser(JSON.parse(userStr));
+        }
+      } catch (e) {
+        console.error('Failed to parse user from localStorage:', e);
+      }
+    }
+  }, []);
+
+  // 切换到普通模式（主应用的 generate 页面）
+  const handleSwitchToNormalMode = () => {
+    // 在 qiankun 环境中，使用 window.location 跳转到主应用
+    // 如果在 iframe 中，尝试使用 parent，否则使用当前窗口
+    try {
+      if (window.parent !== window) {
+        // 在 iframe 中
+        window.parent.location.href = '/generate';
+      } else {
+        // 直接跳转
+        window.location.href = '/generate';
+      }
+    } catch (e) {
+      // 跨域限制，使用当前窗口
+      window.location.href = '/generate';
+    }
+  };
+
+  // 处理登录
+  const handleLogin = () => {
+    // 跳转到主应用的登录页面
+    try {
+      if (window.parent !== window) {
+        window.parent.location.href = '/generate';
+      } else {
+        window.location.href = '/generate';
+      }
+    } catch (e) {
+      window.location.href = '/generate';
+    }
+  };
+
+  // 处理登出
+  const handleLogout = () => {
+    const sharedStore = (window as any).__SHARED_STORE__;
+    if (sharedStore) {
+      sharedStore.clear();
+    } else {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('currentUser');
+    }
+    setUser(null);
+    // 刷新页面
+    window.location.reload();
+  };
 
   return (
-    <header className="h-16 border-b border-slate-800/60 flex items-center justify-between px-6 bg-slate-900/40 backdrop-blur-2xl z-40">
+    <header className="h-16 border-b border-slate-800/80 flex items-center justify-between px-6 bg-slate-950/70 backdrop-blur-3xl z-40">
       <div className="flex items-center gap-5">
         <button
           onClick={onBack}
           className="p-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-xl transition-all"
+          title={lang === 'zh' ? '返回工作流列表' : 'Back to Workflows'}
         >
           <ChevronLeft size={20} />
         </button>
@@ -93,12 +185,28 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
             }}
             className="bg-transparent border-none text-base font-bold focus:ring-0 p-0 hover:bg-slate-800/20 rounded px-1 transition-colors w-64"
           />
-          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
-            {t('editing_logic')}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
+              {t('editing_logic')}
+            </span>
+            {workflow.id && (workflow.id.startsWith('workflow-') || workflow.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) && (
+              <span className="text-[9px] text-slate-600 font-mono">
+                <Hash size={8} className="inline mr-0.5" />
+                {workflow.id.substring(0, 8)}...
+              </span>
+            )}
+          </div>
         </div>
       </div>
       <div className="flex items-center gap-4">
+        <a
+          href="https://github.com/ModelTC/LightX2V"
+          target="_blank"
+          className="flex items-center gap-2 px-3 py-1.5 bg-slate-900/60 hover:bg-slate-900 text-slate-300 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all border border-slate-800/80 group"
+        >
+          <Github size={12} className="group-hover:text-[#90dce1]" />
+          <span className="hidden lg:inline">{t('visit_github')}</span>
+        </a>
         {/* Undo/Redo Controls */}
         <div className="flex items-center gap-1 bg-slate-800/50 border border-slate-800 rounded-xl p-1">
           <button
@@ -118,7 +226,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
             <Redo size={14} />
           </button>
         </div>
-        
+
         {/* Zoom Controls */}
         <div className="flex items-center gap-1 bg-slate-800/50 border border-slate-800 rounded-xl p-1">
           <button
@@ -149,15 +257,37 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
 
         <button
           onClick={onToggleLang}
-          className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 hover:bg-slate-800 text-slate-400 rounded-xl text-[10px] font-bold transition-all border border-slate-800"
+          className="flex items-center gap-2 px-3 py-1.5 bg-slate-900/60 hover:bg-slate-900 text-slate-300 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all border border-slate-800/80"
         >
           <Languages size={12} /> {t('lang_name')}
         </button>
+        <div className="flex items-center bg-slate-950/50 p-1 rounded-2xl border border-slate-800/50">
+          <button
+            onClick={() => onVisibilityChange(false)}
+            className={`px-3 py-1.5 rounded-xl flex items-center gap-2 transition-all ${
+              !isPublic ? 'bg-slate-800 text-slate-200 shadow-xl' : 'text-slate-600 hover:text-slate-400'
+            }`}
+          >
+            <Lock size={12} />
+            <span className="text-[10px] font-black uppercase tracking-widest">{t('visibility_private')}</span>
+          </button>
+          <button
+            onClick={() => onVisibilityChange(true)}
+            className={`px-3 py-1.5 rounded-xl flex items-center gap-2 transition-all ${
+              isPublic
+                ? 'bg-green-500/10 text-green-400 border border-green-500/20 shadow-xl shadow-green-500/5'
+                : 'text-slate-600 hover:text-slate-400'
+            }`}
+          >
+            <Globe size={12} />
+            <span className="text-[10px] font-black uppercase tracking-widest">{t('visibility_public')}</span>
+          </button>
+        </div>
         {selectedRunId && (
           <>
-            <div className="flex items-center gap-2 px-4 py-2 bg-indigo-500/20 rounded-xl border border-indigo-500/30 animate-pulse">
-              <BookOpen size={14} className="text-indigo-400" />
-              <span className="text-[10px] font-black uppercase text-indigo-400">
+            <div className="flex items-center gap-2 px-4 py-2 bg-[#90dce1]/20 rounded-xl border border-[#90dce1]/30 animate-pulse">
+              <BookOpen size={14} className="text-[#90dce1]" />
+              <span className="text-[10px] font-black uppercase text-[#90dce1]">
                 {t('snapshot_view')}
               </span>
               <button onClick={onClearSnapshot} className="ml-2 hover:text-white">
@@ -165,7 +295,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
               </button>
             </div>
             <div className="flex items-center gap-2 px-4 py-2 bg-slate-800/50 rounded-xl border border-slate-800">
-              <Timer size={14} className="text-indigo-400" />
+              <Timer size={14} className="text-[#90dce1]" />
               <span className="text-[10px] font-black uppercase text-slate-300">
                 {t('run_time')}:{' '}
                 {formatTime(
@@ -177,35 +307,43 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
         )}
         <button
           onClick={onSave}
-          className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-bold border transition-all ${
-            workflow.isDirty
-              ? 'bg-indigo-600/10 border-indigo-500 text-indigo-400 hover:bg-indigo-600/20'
-              : 'bg-slate-800 border-slate-700 text-slate-500'
+          disabled={isSaving}
+          className={`flex items-center gap-2 px-6 py-2 rounded-2xl text-[11px] font-bold uppercase tracking-widest border-2 transition-all shadow-[0_8px_20px_rgba(15,23,42,0.35)] ${
+            isSaving
+              ? 'bg-slate-800 border-slate-700 text-slate-500 cursor-not-allowed'
+              : workflow.isDirty
+              ? 'bg-slate-900/70 border-[#90dce1]/80 text-slate-200 hover:shadow-[0_0_20px_rgba(144,220,225,0.25)] hover:-translate-y-0.5'
+              : 'bg-slate-900/70 border-slate-700/80 text-slate-500'
           }`}
         >
           <Save size={16} /> {t('save_flow')}
         </button>
         <div className="w-px h-6 bg-slate-800"></div>
-        {isRunning && (
+        {isRunning && !isPaused && (
+          <button
+            onClick={onStop}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-2xl text-sm font-bold shadow-xl transition-all bg-red-600 hover:bg-red-500 text-white shadow-red-500/20 active:scale-95"
+          >
+            <Square size={16} />
+            {lang === 'zh' ? '停止' : 'Stop'}
+          </button>
+        )}
+        {isRunning && isPaused && (
           <button
             onClick={onPause}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl text-sm font-bold shadow-xl transition-all ${
-              isPaused
-                ? 'bg-yellow-600 hover:bg-yellow-500 text-white shadow-yellow-500/20'
-                : 'bg-orange-600 hover:bg-orange-500 text-white shadow-orange-500/20'
-            } active:scale-95`}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-2xl text-sm font-bold shadow-xl transition-all bg-yellow-600 hover:bg-yellow-500 text-white shadow-yellow-500/20 active:scale-95"
           >
-            {isPaused ? <Play size={16} /> : <Pause size={16} />}
-            {isPaused ? (lang === 'zh' ? '继续' : 'Resume') : (lang === 'zh' ? '暂停' : 'Pause')}
+            <Play size={16} />
+            {lang === 'zh' ? '继续' : 'Resume'}
           </button>
         )}
         <button
           onClick={onRun}
           disabled={isRunning && !isPaused}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl text-sm font-bold shadow-xl transition-all ${
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-[0_10px_30px_rgba(144,220,225,0.35)] transition-all ${
             isRunning && !isPaused
-              ? 'bg-slate-800 text-slate-500'
-              : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20 active:scale-95'
+              ? 'bg-slate-800 text-slate-500 shadow-none'
+              : 'bg-[#90dce1] hover:bg-[#7dd3da] text-slate-900 hover:shadow-[0_0_28px_rgba(144,220,225,0.5)] hover:-translate-y-0.5 active:scale-95'
           }`}
         >
           {isRunning && !isPaused ? (
@@ -215,8 +353,14 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
           )}
           {isRunning && !isPaused ? t('executing') : t('run_fabric')}
         </button>
+
+        <UserCard
+          user={user}
+          lang={lang}
+          onLogin={handleLogin}
+          onLogout={handleLogout}
+        />
       </div>
     </header>
   );
 };
-

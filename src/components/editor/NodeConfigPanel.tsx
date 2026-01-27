@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Settings,
   Trash2,
@@ -17,6 +17,7 @@ import {
 import { WorkflowState, WorkflowNode, Port, DataType } from '../../../types';
 import { TOOLS } from '../../../constants';
 import { useTranslation, Language } from '../../i18n/useTranslation';
+import { uploadNodeInputFile } from '../../utils/workflowFileManager';
 
 interface NodeConfigPanelProps {
   lang: Language;
@@ -78,11 +79,12 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
   style
 }) => {
   const { t } = useTranslation(lang);
+  const [uploadingNodes, setUploadingNodes] = useState<Set<string>>(new Set());
   const selectedNode = selectedNodeId ? workflow.nodes.find(n => n.id === selectedNodeId) : null;
 
   if (selectedNodeId && selectedNode) {
       return (
-        <aside 
+        <aside
           className={`flex flex-col z-30 transition-all ${collapsed ? 'h-0 overflow-hidden' : 'p-6 overflow-y-auto'}`}
           style={style}
       >
@@ -108,7 +110,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                 <select
                   value={selectedNode.data.model}
                   onChange={e => onUpdateNodeData(selectedNode.id, 'model', e.target.value)}
-                  className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
+                  className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-#90dce1/50 focus:border-[#90dce1] transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
                 >
                   {TOOLS.find(t => t.id === selectedNode.toolId)?.models?.map(m => (
                     <option key={m.id} value={m.id}>{m.name}</option>
@@ -118,7 +120,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
             )}
 
             {/* Web Search Toggle for DeepSeek and Doubao */}
-            {selectedNode.toolId === 'text-generation' && 
+            {selectedNode.toolId === 'text-generation' &&
               (selectedNode.data.model?.startsWith('deepseek-') || selectedNode.data.model?.startsWith('doubao-')) && (
               <div className="space-y-2">
                 <span className="text-[10px] text-slate-500 font-black uppercase flex items-center gap-2">
@@ -129,7 +131,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                     type="checkbox"
                     checked={selectedNode.data.useSearch || false}
                     onChange={e => onUpdateNodeData(selectedNode.id, 'useSearch', e.target.checked)}
-                    className="w-5 h-5 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 cursor-pointer"
+                    className="w-5 h-5 rounded border-slate-600 bg-slate-800 text-[#90dce1] focus:ring-#90dce1 focus:ring-offset-slate-900 cursor-pointer"
                   />
                   <span className="text-xs text-slate-300">
                     {lang === 'zh' ? '启用联网搜索功能' : 'Enable web search'}
@@ -146,7 +148,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                   <select
                     value={selectedNode.data.mode}
                     onChange={e => onUpdateNodeData(selectedNode.id, 'mode', e.target.value)}
-                    className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
+                    className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-#90dce1/50 focus:border-[#90dce1] transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
                   >
                     {['basic', 'enhance', 'summarize', 'polish', 'custom'].map(m => (
                       <option key={m} value={m}>{m.toUpperCase()}</option>
@@ -160,7 +162,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                     <textarea
                       value={selectedNode.data.customInstruction || ''}
                       onChange={e => onUpdateNodeData(selectedNode.id, 'customInstruction', e.target.value)}
-                      className="w-full h-32 bg-slate-800/40 border border-slate-700/50 rounded-2xl p-4 text-xs resize-none focus:border-indigo-500 transition-all"
+                      className="w-full h-32 bg-slate-800/40 border border-slate-700/50 rounded-2xl p-4 text-xs resize-none focus:border-[#90dce1] transition-all"
                       placeholder="Set global AI behavior..."
                     />
                   </div>
@@ -180,7 +182,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                             n[i].id = e.target.value;
                             onUpdateNodeData(selectedNode.id, 'customOutputs', n);
                           }}
-                          className="bg-transparent border-none text-[10px] font-black text-indigo-400 flex-1 p-0 focus:ring-0"
+                          className="bg-transparent border-none text-[10px] font-black text-[#90dce1] flex-1 p-0 focus:ring-0"
                         />
                         <button
                           onClick={() => {
@@ -200,7 +202,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                           n[i].description = e.target.value;
                           onUpdateNodeData(selectedNode.id, 'customOutputs', n);
                         }}
-                        className="w-full h-16 bg-slate-900/50 border border-slate-800 rounded-xl p-2 text-[10px] text-slate-400 resize-none focus:border-indigo-500 focus:ring-0 transition-all"
+                        className="w-full h-16 bg-slate-900/50 border border-slate-800 rounded-xl p-2 text-[10px] text-slate-400 resize-none focus:border-[#90dce1] focus:ring-0 transition-all"
                       />
                     </div>
                   ))}
@@ -209,7 +211,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                       const n = [...(selectedNode.data.customOutputs || []), { id: `out_${Date.now().toString().slice(-4)}`, label: 'Output', description: '' }];
                       onUpdateNodeData(selectedNode.id, 'customOutputs', n);
                     }}
-                    className="w-full py-2 border border-dashed border-slate-700 rounded-xl text-[10px] text-slate-500 uppercase hover:text-indigo-400 transition-all"
+                    className="w-full py-2 border border-dashed border-slate-700 rounded-xl text-[10px] text-slate-500 uppercase hover:text-[#90dce1] transition-all"
                   >
                     + {t('add_output')}
                   </button>
@@ -224,7 +226,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                 <select
                   value={selectedNode.data.aspectRatio}
                   onChange={e => onUpdateNodeData(selectedNode.id, 'aspectRatio', e.target.value)}
-                  className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
+                  className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-#90dce1/50 focus:border-[#90dce1] transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
                 >
                   {selectedNode.toolId.includes('video-gen')
                     ? ['16:9', '9:16'].map(r => <option key={r} value={r}>{r}</option>)
@@ -245,7 +247,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                     <select
                       value={selectedNode.data.voice || 'Kore'}
                       onChange={e => onUpdateNodeData(selectedNode.id, 'voice', e.target.value)}
-                      className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
+                      className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-#90dce1/50 focus:border-[#90dce1] transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
                     >
                       {['Kore', 'Puck', 'Fenrir', 'Charon', 'Zephyr'].map(v => (
                         <option key={v} value={v}>{v}</option>
@@ -274,12 +276,12 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                               value={voiceSearchQuery}
                               onChange={e => setVoiceSearchQuery(e.target.value)}
                               placeholder="Search voices..."
-                              className="w-full bg-slate-800 rounded-xl pl-10 pr-3 py-2 text-xs border border-slate-700 text-slate-300 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                              className="w-full bg-slate-800 rounded-xl pl-10 pr-3 py-2 text-xs border border-slate-700 text-slate-300 placeholder-slate-500 focus:outline-none focus:border-[#90dce1]"
                             />
                           </div>
                           <button
                             onClick={() => setShowVoiceFilter(!showVoiceFilter)}
-                            className={`px-3 py-2 bg-slate-800 rounded-xl text-xs border border-slate-700 text-slate-300 hover:bg-slate-700 transition-colors flex items-center gap-1 ${showVoiceFilter ? 'border-indigo-500 bg-slate-700' : ''}`}
+                            className={`px-3 py-2 bg-slate-800 rounded-xl text-xs border border-slate-700 text-slate-300 hover:bg-slate-700 transition-colors flex items-center gap-1 ${showVoiceFilter ? 'border-[#90dce1] bg-slate-700' : ''}`}
                           >
                             <ListPlus className="w-3 h-3" />
                             Filter
@@ -294,7 +296,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                               <select
                                 value={voiceFilterGender}
                                 onChange={e => setVoiceFilterGender(e.target.value)}
-                                className="w-full bg-slate-900/80 hover:bg-slate-900 rounded-lg px-3 py-1.5 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:16px_16px] bg-[right_8px_center] bg-no-repeat pr-8 shadow-sm"
+                                className="w-full bg-slate-900/80 hover:bg-slate-900 rounded-lg px-3 py-1.5 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-300 focus:outline-none focus:ring-2 focus:ring-#90dce1/50 focus:border-[#90dce1] transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:16px_16px] bg-[right_8px_center] bg-no-repeat pr-8 shadow-sm"
                               >
                                 <option value="all">All</option>
                                 <option value="female">Female</option>
@@ -323,7 +325,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                                     key={uniqueKey}
                                     className={`relative cursor-pointer m-0 p-3 rounded-lg border-2 transition-all ${
                                       isSelected
-                                        ? 'border-indigo-500 bg-indigo-500/10 shadow-lg shadow-indigo-500/20'
+                                        ? 'border-[#90dce1] bg-[#90dce1]/10 shadow-lg shadow-[#90dce1]/20'
                                         : 'border-slate-700 bg-slate-900/50 hover:border-slate-600 hover:bg-slate-800'
                                     }`}
                                   >
@@ -341,12 +343,12 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                                       className="sr-only"
                                     />
                                     {voice.version === '2.0' && (
-                                      <div className="absolute top-1 right-1 px-1 py-0.5 bg-indigo-500/90 text-white text-[7px] font-semibold rounded z-10">
+                                      <div className="absolute top-1 right-1 px-1 py-0.5 bg-[#90dce1]/90 text-white text-[7px] font-semibold rounded z-10">
                                         v2.0
                                       </div>
                                     )}
                                     {isSelected && (
-                                      <div className="absolute bottom-2 right-2 w-4 h-4 bg-indigo-500 rounded-full flex items-center justify-center z-20">
+                                      <div className="absolute bottom-2 right-2 w-4 h-4 bg-[#90dce1] rounded-full flex items-center justify-center z-20">
                                         <CheckCircle2 className="w-2.5 h-2.5 text-white" />
                                       </div>
                                     )}
@@ -376,7 +378,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                       <select
                         value={selectedNode.data.emotion || ''}
                         onChange={e => onUpdateNodeData(selectedNode.id, 'emotion', e.target.value)}
-                        className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
+                        className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-#90dce1/50 focus:border-[#90dce1] transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
                       >
                         <option value="">None</option>
                         {lightX2VVoiceList.emotions.map((emotion: string, index: number) => (
@@ -451,7 +453,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                     <span className="text-[10px] text-slate-500 font-black uppercase">Cloned Voice</span>
                     <button
                       onClick={onShowCloneVoiceModal}
-                      className="px-2 py-1 text-[9px] bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 rounded border border-indigo-500/30 transition-all"
+                      className="px-2 py-1 text-[9px] bg-[#90dce1]/20 hover:bg-[#90dce1]/30 text-[#90dce1] rounded border border-[#90dce1]/30 transition-all"
                     >
                       + New
                     </button>
@@ -464,7 +466,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                     <select
                       value={selectedNode.data.speakerId || ''}
                       onChange={e => onUpdateNodeData(selectedNode.id, 'speakerId', e.target.value)}
-                      className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
+                      className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-#90dce1/50 focus:border-[#90dce1] transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
                     >
                       <option value="">Select a cloned voice...</option>
                       {cloneVoiceList.map((voice: any) => (
@@ -534,7 +536,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                     <select
                       value={selectedNode.data.language || 'ZH_CN'}
                       onChange={e => onUpdateNodeData(selectedNode.id, 'language', e.target.value)}
-                      className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
+                      className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-xl p-3 text-xs border border-slate-700/60 hover:border-slate-600 text-slate-200 focus:outline-none focus:ring-2 focus:ring-#90dce1/50 focus:border-[#90dce1] transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:20px_20px] bg-[right_12px_center] bg-no-repeat pr-10 shadow-sm"
                     >
                       {['ZH_CN', 'EN_US', 'ZH_CN_SICHUAN', 'ZH_CN_HK'].map(l => (
                         <option key={l} value={l}>{l}</option>
@@ -588,7 +590,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                     <div key={port.id} className="p-4 bg-slate-950/40 border border-slate-800 rounded-[24px] space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="flex flex-col gap-1">
-                          <span className="text-[9px] font-black text-indigo-400 uppercase">{fieldLabel}</span>
+                          <span className="text-[9px] font-black text-[#90dce1] uppercase">{fieldLabel}</span>
                           <span className="text-[8px] text-slate-500">
                             {lang === 'zh' ? '来自' : 'From'}: {lang === 'zh' ? TOOLS.find(t => t.id === sourceNode.toolId)?.name_zh : TOOLS.find(t => t.id === sourceNode.toolId)?.name} → {port.label}
                           </span>
@@ -614,7 +616,7 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                           newOverrides[port.id] = e.target.value;
                           onUpdateNodeData(selectedNode.id, 'inputOverrides', newOverrides);
                         }}
-                        className="w-full h-32 bg-slate-900/50 border border-slate-800 rounded-xl p-3 text-[10px] text-slate-300 resize-none focus:border-indigo-500 focus:ring-0 transition-all font-mono"
+                        className="w-full h-32 bg-slate-900/50 border border-slate-800 rounded-xl p-3 text-[10px] text-slate-300 resize-none focus:border-[#90dce1] focus:ring-0 transition-all font-mono"
                         placeholder={lang === 'zh' ? '编辑字段内容...' : 'Edit field content...'}
                       />
                       {overrideValue !== undefined && (
@@ -655,46 +657,99 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
                     <textarea
                       value={item.isSourceNode ? (workflow.nodes.find(n => n.id === item.nodeId)?.data.value || '') : (workflow.globalInputs[`${item.nodeId}-${item.port.id}`] || '')}
                       onChange={e => item.isSourceNode ? onUpdateNodeData(item.nodeId, 'value', e.target.value) : onGlobalInputChange(item.nodeId, item.port.id, e.target.value)}
-                      className="w-full h-24 bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs resize-none focus:border-indigo-500 transition-all custom-scrollbar"
+                      className="w-full h-24 bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs resize-none focus:border-[#90dce1] transition-all custom-scrollbar"
                     />
                   ) : (
                     <div className="space-y-3">
-                      <label className="flex items-center justify-center w-full h-12 border border-dashed border-slate-700 rounded-xl cursor-pointer hover:border-indigo-500 hover:bg-indigo-500/5 transition-all gap-2">
+                      <label className="flex items-center justify-center w-full h-12 border border-dashed border-slate-700 rounded-xl cursor-pointer hover:border-[#90dce1] hover:bg-[#90dce1]/5 transition-all gap-2">
                         <Upload size={14} className="text-slate-500" />
                         <span className="text-[10px] text-slate-500 font-bold uppercase">{lang === 'zh' ? '上传文件' : 'Upload File'}</span>
                         <input
                           type="file"
                           accept={item.dataType === DataType.IMAGE ? "image/*" : item.dataType === DataType.AUDIO ? "audio/*" : "video/*"}
                           className="hidden"
+                          disabled={uploadingNodes.has(item.nodeId)}
                           onChange={async (e) => {
                             const file = e.target.files?.[0];
-                            if (file) {
-                              const base64 = await new Promise<string>((resolve) => {
-                                const reader = new FileReader();
-                                reader.onloadend = () => resolve(reader.result as string);
-                                reader.readAsDataURL(file);
-                              });
+                            if (!file) return;
+
+                            // 需要 workflow.id 才能上传
+                            if (!workflow.id || (!workflow.id.startsWith('workflow-') && !workflow.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i))) {
+                              console.error('[NodeConfigPanel] Cannot upload file: workflow ID is not available');
+                              return;
+                            }
+
+                            setUploadingNodes(prev => new Set(prev).add(item.nodeId));
+
+                            try {
                               if (item.isSourceNode) {
-                                onUpdateNodeData(item.nodeId, 'value', item.dataType === DataType.IMAGE ? [base64] : base64);
+                                const node = workflow.nodes.find(n => n.id === item.nodeId);
+                                if (!node) return;
+
+                                const tool = TOOLS.find(t => t.id === node.toolId);
+                                if (!tool || tool.category !== 'Input') {
+                                  console.error('[NodeConfigPanel] Cannot upload file: node is not an input node');
+                                  return;
+                                }
+
+                                const outputPort = tool.outputs[0];
+                                if (!outputPort) {
+                                  console.error('[NodeConfigPanel] Cannot upload file: output port not found');
+                                  return;
+                                }
+
+                                const result = await uploadNodeInputFile(workflow.id!, item.nodeId, outputPort.id, file);
+                                if (result) {
+                                  // 更新 node.data.value，始终使用数组格式
+                                  const currentValue = node.data.value || [];
+                                  const existingUrls = Array.isArray(currentValue) ? currentValue : [currentValue].filter(Boolean);
+                                  const newValue = item.dataType === DataType.IMAGE
+                                    ? [...existingUrls, result.file_url]
+                                    : [result.file_url];
+                                  onUpdateNodeData(item.nodeId, 'value', newValue);
+                                }
                               } else {
+                                // 对于非源节点的全局输入，暂时保持原逻辑（base64）
+                                const base64 = await new Promise<string>((resolve) => {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => resolve(reader.result as string);
+                                  reader.readAsDataURL(file);
+                                });
                                 onGlobalInputChange(item.nodeId, item.port.id, base64);
                               }
+                            } catch (err) {
+                              console.error('[NodeConfigPanel] Error uploading file:', err);
+                            } finally {
+                              setUploadingNodes(prev => {
+                                const next = new Set(prev);
+                                next.delete(item.nodeId);
+                                return next;
+                              });
                             }
                           }}
                         />
                       </label>
-                      {item.isSourceNode ? (
-                        workflow.nodes.find(n => n.id === item.nodeId)?.data.value && (
-                          <div className="text-[9px] text-slate-400">
-                            {lang === 'zh' ? '已上传文件' : 'File uploaded'}
-                          </div>
-                        )
+                      {uploadingNodes.has(item.nodeId) ? (
+                        <div className="flex items-center gap-1 text-[9px] text-[#90dce1]">
+                          <RefreshCw size={8} className="animate-spin" />
+                          <span>{lang === 'zh' ? '上传中...' : 'Uploading...'}</span>
+                        </div>
                       ) : (
-                        workflow.globalInputs[`${item.nodeId}-${item.port.id}`] && (
-                          <div className="text-[9px] text-slate-400">
-                            {lang === 'zh' ? '已上传文件' : 'File uploaded'}
-                          </div>
-                        )
+                        <>
+                          {item.isSourceNode ? (
+                            workflow.nodes.find(n => n.id === item.nodeId)?.data.value && (
+                              <div className="text-[9px] text-slate-400">
+                                {lang === 'zh' ? '已上传文件' : 'File uploaded'}
+                              </div>
+                            )
+                          ) : (
+                            workflow.globalInputs[`${item.nodeId}-${item.port.id}`] && (
+                              <div className="text-[9px] text-slate-400">
+                                {lang === 'zh' ? '已上传文件' : 'File uploaded'}
+                              </div>
+                            )
+                          )}
+                        </>
                       )}
                     </div>
                   )}
@@ -707,5 +762,3 @@ export const NodeConfigPanel: React.FC<NodeConfigPanelProps> = ({
     </aside>
   );
 };
-
-

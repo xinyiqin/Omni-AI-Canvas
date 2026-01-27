@@ -13,7 +13,7 @@ interface AIChatPanelProps {
   onClose: () => void;
   chatHistory: ChatMessageType[];
   isProcessing: boolean;
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string, options?: { image?: { data: string; mimeType: string }; useSearch?: boolean }) => void;
   onUndo?: (messageId: string) => void;
   onRetry?: (messageId: string) => void;
   lang: Language;
@@ -44,10 +44,16 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // 自动滚动到底部
+  // 自动滚动到底部（只滚动容器内部，不影响页面）
   useEffect(() => {
     if (messagesEndRef.current && scrollContainerRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      // 使用 requestAnimationFrame 确保 DOM 更新完成后再滚动
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.current && messagesEndRef.current) {
+          // 直接设置 scrollTop，避免 scrollIntoView 导致页面整体滚动
+          scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+        }
+      });
     }
   }, [chatHistory, isProcessing]);
 
@@ -63,7 +69,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/60 bg-slate-900/60">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center shrink-0">
+          <div className="w-6 h-6 rounded-full bg-[#90dce1] flex items-center justify-center shrink-0">
             <Bot size={14} className="text-white" />
           </div>
           <span className="text-sm font-bold text-slate-200 shrink-0">
@@ -73,12 +79,12 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
           {onModelChange && (() => {
             const geminiTextTool = TOOLS.find(t => t.id === 'text-generation');
             const availableModels = geminiTextTool?.models || [];
-            
+
             return (
               <select
                 value={aiModel}
                 onChange={(e) => onModelChange(e.target.value)}
-                className="ml-2 px-3 py-1.5 text-xs bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:16px_16px] bg-[right_8px_center] bg-no-repeat pr-8 shadow-sm"
+                className="ml-2 px-3 py-1.5 text-xs bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-#90dce1/50 focus:border-[#90dce1] transition-all cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%23cbd5e1%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E')] bg-[length:16px_16px] bg-[right_8px_center] bg-no-repeat pr-8 shadow-sm"
                 disabled={isProcessing}
                 title={lang === 'zh' ? '选择AI模型' : 'Select AI Model'}
               >
@@ -130,10 +136,11 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
           <div
             ref={scrollContainerRef}
             className="flex-1 overflow-y-auto p-4 custom-scrollbar"
+            style={{ minHeight: 0 }}
           >
             {chatHistory.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center px-4">
-                <Bot size={32} className="text-indigo-400 mb-3" />
+              <div className="flex flex-col items-center justify-center min-h-full text-center px-4">
+                <Bot size={32} className="text-[#90dce1] mb-3" />
                 <p className="text-sm text-slate-400 mb-1">
                   {lang === 'zh' ? '你好！我可以帮你修改工作流' : 'Hello! I can help you modify the workflow'}
                 </p>
@@ -150,19 +157,21 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
                     lang={lang}
                     onUndo={onUndo ? () => onUndo(message.id) : undefined}
                     onRetry={onRetry ? () => onRetry(message.id) : undefined}
+                    thinking={message.thinking}
+                    isStreaming={message.isStreaming}
                   />
                 ))}
                 {isProcessing && (
                   <div className="flex gap-3 mb-4">
-                    <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-[#90dce1] flex items-center justify-center shrink-0">
                       <Bot size={16} className="text-white" />
                     </div>
                     <div className="flex-1 bg-slate-800/50 border border-slate-700 rounded-2xl px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div className="flex gap-1">
-                          <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                          <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                          <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                          <div className="w-1.5 h-1.5 bg-[#90dce1] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                          <div className="w-1.5 h-1.5 bg-[#90dce1] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                          <div className="w-1.5 h-1.5 bg-[#90dce1] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                         </div>
                         <span className="text-sm text-slate-400">
                           {lang === 'zh' ? '正在思考...' : 'Thinking...'}
@@ -187,4 +196,3 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
     </div>
   );
 };
-
