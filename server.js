@@ -3,9 +3,11 @@
  * Railway runs npm start without a shell, so ${PORT} is not expanded;
  * this script passes 0.0.0.0:PORT explicitly so serve listens correctly.
  */
-const { spawn } = require('child_process');
-const path = require('path');
+import { spawn } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const port = process.env.PORT || '3000';
 const listen = `0.0.0.0:${port}`;
 const serveBin = path.join(__dirname, 'node_modules', 'serve', 'build', 'main.js');
