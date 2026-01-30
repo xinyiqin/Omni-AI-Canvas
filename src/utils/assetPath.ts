@@ -40,5 +40,7 @@ export function setAssetBasePath(basePath: string = '/canvas'): void {
 }
 
 export function getAssetBasePath(): string {
-  return (window as any).__ASSET_BASE_PATH__ || '/canvas';
+  const v = (window as any).__ASSET_BASE_PATH__;
+  if (v !== undefined && v !== null) return v;
+  return (window as any).__POWERED_BY_QIANKUN__ ? '/canvas' : '';
 }

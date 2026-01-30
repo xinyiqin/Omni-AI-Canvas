@@ -2,6 +2,7 @@ import React from 'react';
 import { Layers, Trash2, Calendar, Sparkle, Lock, Globe, Heart, Users, Boxes } from 'lucide-react';
 import { WorkflowState } from '../../../types';
 import { useTranslation, Language } from '../../i18n/useTranslation';
+import { getAssetBasePath } from '../../utils/assetPath';
 
 interface WorkflowCardProps {
   workflow: WorkflowState;
@@ -72,7 +73,7 @@ export const WorkflowCard: React.FC<WorkflowCardProps> = ({
             src={
               previewImage.startsWith('/')
                 ? (previewImage.startsWith('/assets/') && !previewImage.startsWith('/canvas/')
-                    ? `${(window as any).__ASSET_BASE_PATH__ || '/canvas'}${previewImage}`
+                    ? `${getAssetBasePath()}${previewImage}`
                     : previewImage)
                 : (previewImage.startsWith('data:')
                     ? previewImage

@@ -14,7 +14,7 @@ import { apiRequest } from '../utils/apiClient';
 import { workflowSaveQueue } from '../utils/workflowSaveQueue';
 import { workflowOfflineQueue } from '../utils/workflowOfflineQueue';
 import { checkWorkflowOwnership, getCurrentUserId } from '../utils/workflowUtils';
-import { getAssetPath } from '../utils/assetPath';
+import { getAssetPath, getAssetBasePath } from '../utils/assetPath';
 
 interface UseWorkflowExecutionProps {
   workflow: WorkflowState | null;
@@ -405,7 +405,7 @@ export const useWorkflowExecution = ({
                             try {
                               // 修复资源路径：如果在 qiankun 环境，确保路径包含 /canvas/
                               let imagePath = img;
-                              const basePath = (window as any).__ASSET_BASE_PATH__ || '/canvas';
+                              const basePath = getAssetBasePath();
                               if (img.startsWith('/assets/') && !img.startsWith('/canvas/')) {
                                 imagePath = `${basePath}${img}`;
                               }
@@ -428,7 +428,7 @@ export const useWorkflowExecution = ({
                         // Convert audio file path to base64 data URL
                         // 修复资源路径：如果在 qiankun 环境，确保路径包含 /canvas/
                         let audioPath = inputValue;
-                        const basePath = (window as any).__ASSET_BASE_PATH__ || '/canvas';
+                        const basePath = getAssetBasePath();
                         if (inputValue.startsWith('/assets/') && !inputValue.startsWith('/canvas/')) {
                           audioPath = `${basePath}${inputValue}`;
                         }

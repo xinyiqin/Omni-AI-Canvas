@@ -201,9 +201,11 @@ window.addEventListener('unhandledrejection', (event) => {
 // 确保生命周期被注册到 window.moudleQiankunAppLifeCycles
 // vite-plugin-qiankun 应该会自动处理，但手动注册确保兼容性
 if (typeof window !== 'undefined') {
-  // 设置资源基础路径
-  // 在 qiankun 环境中为 /canvas，独立运行时为空字符串（因为 base 是 /）
-  (window as any).__ASSET_BASE_PATH__ = (window as any).__POWERED_BY_QIANKUN__ ? '/canvas' : '';
+  // 设置资源基础路径：qiankun 用 /canvas，独立运行用 Vite 的 base（与构建一致，Railway 根路径部署为 ''）
+  const baseUrl = typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL
+    ? import.meta.env.BASE_URL.replace(/\/$/, '') || ''
+    : '';
+  (window as any).__ASSET_BASE_PATH__ = (window as any).__POWERED_BY_QIANKUN__ ? '/canvas' : baseUrl;
 
   if (!window.moudleQiankunAppLifeCycles) {
     (window as any).moudleQiankunAppLifeCycles = {};

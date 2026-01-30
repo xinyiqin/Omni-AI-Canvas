@@ -30,6 +30,10 @@ export default defineConfig(({ mode }) => {
       console.log('  LIGHTX2V_CLOUD_URL:', mergedEnv.LIGHTX2V_CLOUD_URL ? `${mergedEnv.LIGHTX2V_CLOUD_URL.substring(0, 10)}...` : '未设置');
       console.log('  LIGHTX2V_CLOUD_TOKEN:', mergedEnv.LIGHTX2V_CLOUD_TOKEN ? `${mergedEnv.LIGHTX2V_CLOUD_TOKEN.substring(0, 10)}...` : '未设置');
     }
+    const basePath =
+      mode === 'production'
+        ? (process.env.VITE_BASE_URL || env.VITE_BASE_URL || '/')
+        : '/';
     return {
       server: {
         port: 3000,
@@ -80,7 +84,7 @@ export default defineConfig(({ mode }) => {
           },
         },
       },
-      // 构建时使用绝对路径 /canvas/，确保在 qiankun 环境中能正确加载
-      base: mode === 'production' ? '/canvas/' : '/',
+      // 生产环境默认使用根路径，可通过 VITE_BASE_URL 覆盖
+      base: basePath,
     };
 });
