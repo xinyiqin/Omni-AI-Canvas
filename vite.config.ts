@@ -58,7 +58,8 @@ export default defineConfig(({ mode }) => {
         'process.env.LIGHTX2V_CLOUD_URL': JSON.stringify(mergedEnv.LIGHTX2V_CLOUD_URL || 'https://x2v.light-ai.top'),
         'process.env.LIGHTX2V_CLOUD_TOKEN': JSON.stringify(mergedEnv.LIGHTX2V_CLOUD_TOKEN || ''),
         'process.env.DEEPSEEK_API_KEY': JSON.stringify(mergedEnv.DEEPSEEK_API_KEY || ''),
-        'process.env.PPCHAT_API_KEY': JSON.stringify(mergedEnv.PPCHAT_API_KEY || '')
+        'process.env.PPCHAT_API_KEY': JSON.stringify(mergedEnv.PPCHAT_API_KEY || ''),
+        'import.meta.env.VITE_STANDALONE': JSON.stringify(mergedEnv.VITE_STANDALONE || '')
       },
       resolve: {
         alias: {
