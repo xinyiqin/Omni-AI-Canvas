@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const port = process.env.PORT || '3000';
-const listen = `0.0.0.0:${port}`;
+const listen = `tcp://0.0.0.0:${port}`;
 const serveBin = path.join(__dirname, 'node_modules', 'serve', 'build', 'main.js');
 
 const child = spawn(
