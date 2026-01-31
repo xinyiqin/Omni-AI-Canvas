@@ -176,6 +176,152 @@ motion_prompt（运镜提示词）：
       }
     ]
   },
+  // AI动画12分镜：角色图+故事 → 规划12镜 → 链式图生图（人物一致）→ 大部分图生视频，场景切换处首尾帧（强调转场运镜）
+  {
+    id: 'preset-ai-animation-12',
+    name: 'AI动画12分镜日常',
+    updatedAt: Date.now(),
+    isDirty: false,
+    isRunning: false,
+    env: { lightx2v_url: '', lightx2v_token: '' },
+    globalInputs: {},
+    history: [],
+    showIntermediateResults: true,
+    connections: [
+      { id: 'anim-c1', sourceNodeId: 'anim-char', sourcePortId: 'out-image', targetNodeId: 'anim-planner', targetPortId: 'in-image' },
+      { id: 'anim-c2', sourceNodeId: 'anim-story', sourcePortId: 'out-text', targetNodeId: 'anim-planner', targetPortId: 'in-text' },
+      { id: 'anim-c3', sourceNodeId: 'anim-char', sourcePortId: 'out-image', targetNodeId: 'anim-i2i-1', targetPortId: 'in-image' },
+      { id: 'anim-c4', sourceNodeId: 'anim-planner', sourcePortId: 'shot1_image_prompt', targetNodeId: 'anim-i2i-1', targetPortId: 'in-text' },
+      { id: 'anim-c5', sourceNodeId: 'anim-i2i-1', sourcePortId: 'out-image', targetNodeId: 'anim-i2i-2', targetPortId: 'in-image' },
+      { id: 'anim-c6', sourceNodeId: 'anim-planner', sourcePortId: 'shot2_image_prompt', targetNodeId: 'anim-i2i-2', targetPortId: 'in-text' },
+      { id: 'anim-c7', sourceNodeId: 'anim-i2i-2', sourcePortId: 'out-image', targetNodeId: 'anim-i2i-3', targetPortId: 'in-image' },
+      { id: 'anim-c8', sourceNodeId: 'anim-planner', sourcePortId: 'shot3_image_prompt', targetNodeId: 'anim-i2i-3', targetPortId: 'in-text' },
+      { id: 'anim-c9', sourceNodeId: 'anim-i2i-3', sourcePortId: 'out-image', targetNodeId: 'anim-i2i-4', targetPortId: 'in-image' },
+      { id: 'anim-c10', sourceNodeId: 'anim-planner', sourcePortId: 'shot4_image_prompt', targetNodeId: 'anim-i2i-4', targetPortId: 'in-text' },
+      { id: 'anim-c11', sourceNodeId: 'anim-i2i-4', sourcePortId: 'out-image', targetNodeId: 'anim-i2i-5', targetPortId: 'in-image' },
+      { id: 'anim-c12', sourceNodeId: 'anim-planner', sourcePortId: 'shot5_image_prompt', targetNodeId: 'anim-i2i-5', targetPortId: 'in-text' },
+      { id: 'anim-c13', sourceNodeId: 'anim-i2i-5', sourcePortId: 'out-image', targetNodeId: 'anim-i2i-6', targetPortId: 'in-image' },
+      { id: 'anim-c14', sourceNodeId: 'anim-planner', sourcePortId: 'shot6_image_prompt', targetNodeId: 'anim-i2i-6', targetPortId: 'in-text' },
+      { id: 'anim-c15', sourceNodeId: 'anim-i2i-6', sourcePortId: 'out-image', targetNodeId: 'anim-i2i-7', targetPortId: 'in-image' },
+      { id: 'anim-c16', sourceNodeId: 'anim-planner', sourcePortId: 'shot7_image_prompt', targetNodeId: 'anim-i2i-7', targetPortId: 'in-text' },
+      { id: 'anim-c17', sourceNodeId: 'anim-i2i-7', sourcePortId: 'out-image', targetNodeId: 'anim-i2i-8', targetPortId: 'in-image' },
+      { id: 'anim-c18', sourceNodeId: 'anim-planner', sourcePortId: 'shot8_image_prompt', targetNodeId: 'anim-i2i-8', targetPortId: 'in-text' },
+      { id: 'anim-c19', sourceNodeId: 'anim-i2i-8', sourcePortId: 'out-image', targetNodeId: 'anim-i2i-9', targetPortId: 'in-image' },
+      { id: 'anim-c20', sourceNodeId: 'anim-planner', sourcePortId: 'shot9_image_prompt', targetNodeId: 'anim-i2i-9', targetPortId: 'in-text' },
+      { id: 'anim-c21', sourceNodeId: 'anim-i2i-9', sourcePortId: 'out-image', targetNodeId: 'anim-i2i-10', targetPortId: 'in-image' },
+      { id: 'anim-c22', sourceNodeId: 'anim-planner', sourcePortId: 'shot10_image_prompt', targetNodeId: 'anim-i2i-10', targetPortId: 'in-text' },
+      { id: 'anim-c23', sourceNodeId: 'anim-i2i-10', sourcePortId: 'out-image', targetNodeId: 'anim-i2i-11', targetPortId: 'in-image' },
+      { id: 'anim-c24', sourceNodeId: 'anim-planner', sourcePortId: 'shot11_image_prompt', targetNodeId: 'anim-i2i-11', targetPortId: 'in-text' },
+      { id: 'anim-c25', sourceNodeId: 'anim-i2i-11', sourcePortId: 'out-image', targetNodeId: 'anim-i2i-12', targetPortId: 'in-image' },
+      { id: 'anim-c26', sourceNodeId: 'anim-planner', sourcePortId: 'shot12_image_prompt', targetNodeId: 'anim-i2i-12', targetPortId: 'in-text' },
+      { id: 'anim-c27', sourceNodeId: 'anim-i2i-1', sourcePortId: 'out-image', targetNodeId: 'anim-v-1', targetPortId: 'in-image' },
+      { id: 'anim-c28', sourceNodeId: 'anim-planner', sourcePortId: 'shot1_video_prompt', targetNodeId: 'anim-v-1', targetPortId: 'in-text' },
+      { id: 'anim-c29', sourceNodeId: 'anim-i2i-2', sourcePortId: 'out-image', targetNodeId: 'anim-v-2', targetPortId: 'in-image' },
+      { id: 'anim-c30', sourceNodeId: 'anim-planner', sourcePortId: 'shot2_video_prompt', targetNodeId: 'anim-v-2', targetPortId: 'in-text' },
+      { id: 'anim-c31', sourceNodeId: 'anim-i2i-3', sourcePortId: 'out-image', targetNodeId: 'anim-v-3', targetPortId: 'in-image' },
+      { id: 'anim-c32', sourceNodeId: 'anim-planner', sourcePortId: 'shot3_video_prompt', targetNodeId: 'anim-v-3', targetPortId: 'in-text' },
+      { id: 'anim-c33', sourceNodeId: 'anim-i2i-3', sourcePortId: 'out-image', targetNodeId: 'anim-v-4', targetPortId: 'in-image-start' },
+      { id: 'anim-c34', sourceNodeId: 'anim-i2i-4', sourcePortId: 'out-image', targetNodeId: 'anim-v-4', targetPortId: 'in-image-end' },
+      { id: 'anim-c35', sourceNodeId: 'anim-planner', sourcePortId: 'shot4_video_prompt', targetNodeId: 'anim-v-4', targetPortId: 'in-text' },
+      { id: 'anim-c36', sourceNodeId: 'anim-i2i-4', sourcePortId: 'out-image', targetNodeId: 'anim-v-5', targetPortId: 'in-image' },
+      { id: 'anim-c37', sourceNodeId: 'anim-planner', sourcePortId: 'shot5_video_prompt', targetNodeId: 'anim-v-5', targetPortId: 'in-text' },
+      { id: 'anim-c38', sourceNodeId: 'anim-i2i-5', sourcePortId: 'out-image', targetNodeId: 'anim-v-6', targetPortId: 'in-image' },
+      { id: 'anim-c39', sourceNodeId: 'anim-planner', sourcePortId: 'shot6_video_prompt', targetNodeId: 'anim-v-6', targetPortId: 'in-text' },
+      { id: 'anim-c40', sourceNodeId: 'anim-i2i-6', sourcePortId: 'out-image', targetNodeId: 'anim-v-7', targetPortId: 'in-image-start' },
+      { id: 'anim-c41', sourceNodeId: 'anim-i2i-7', sourcePortId: 'out-image', targetNodeId: 'anim-v-7', targetPortId: 'in-image-end' },
+      { id: 'anim-c42', sourceNodeId: 'anim-planner', sourcePortId: 'shot7_video_prompt', targetNodeId: 'anim-v-7', targetPortId: 'in-text' },
+      { id: 'anim-c43', sourceNodeId: 'anim-i2i-7', sourcePortId: 'out-image', targetNodeId: 'anim-v-8', targetPortId: 'in-image' },
+      { id: 'anim-c44', sourceNodeId: 'anim-planner', sourcePortId: 'shot8_video_prompt', targetNodeId: 'anim-v-8', targetPortId: 'in-text' },
+      { id: 'anim-c45', sourceNodeId: 'anim-i2i-8', sourcePortId: 'out-image', targetNodeId: 'anim-v-9', targetPortId: 'in-image' },
+      { id: 'anim-c46', sourceNodeId: 'anim-planner', sourcePortId: 'shot9_video_prompt', targetNodeId: 'anim-v-9', targetPortId: 'in-text' },
+      { id: 'anim-c47', sourceNodeId: 'anim-i2i-9', sourcePortId: 'out-image', targetNodeId: 'anim-v-10', targetPortId: 'in-image-start' },
+      { id: 'anim-c48', sourceNodeId: 'anim-i2i-10', sourcePortId: 'out-image', targetNodeId: 'anim-v-10', targetPortId: 'in-image-end' },
+      { id: 'anim-c49', sourceNodeId: 'anim-planner', sourcePortId: 'shot10_video_prompt', targetNodeId: 'anim-v-10', targetPortId: 'in-text' },
+      { id: 'anim-c50', sourceNodeId: 'anim-i2i-11', sourcePortId: 'out-image', targetNodeId: 'anim-v-11', targetPortId: 'in-image' },
+      { id: 'anim-c51', sourceNodeId: 'anim-planner', sourcePortId: 'shot11_video_prompt', targetNodeId: 'anim-v-11', targetPortId: 'in-text' },
+      { id: 'anim-c52', sourceNodeId: 'anim-i2i-12', sourcePortId: 'out-image', targetNodeId: 'anim-v-12', targetPortId: 'in-image' },
+      { id: 'anim-c53', sourceNodeId: 'anim-planner', sourcePortId: 'shot12_video_prompt', targetNodeId: 'anim-v-12', targetPortId: 'in-text' }
+    ],
+    nodes: [
+      { id: 'anim-char', toolId: 'image-input', x: 50, y: 80, status: NodeStatus.IDLE, data: { value: ['/assets/girl.png'] } },
+      { id: 'anim-story', toolId: 'text-input', x: 50, y: 280, status: NodeStatus.IDLE, data: { value: '初音未来的日常，从早上睡醒到晚上睡觉。' } },
+      {
+        id: 'anim-planner',
+        toolId: 'text-generation',
+        x: 400,
+        y: 180,
+        status: NodeStatus.IDLE,
+        data: {
+          model: 'doubao-seed-1-6-vision-250815',
+          mode: 'custom',
+          customInstruction: `你是一位日系二次元动画分镜师。用户会提供一张角色参考图（默认初音未来或用户自定）和一段故事概述（默认：初音未来的日常，从早上睡醒到晚上睡觉）。请生成12个分镜的详细描述，所有输出字段使用中文。
+
+人物一致性（绝对关键）：
+- 第一镜：基于用户提供的角色图，描述「该角色在某一场景中的姿态与表情」，保持与参考图一致的发型、发色、服装、五官。
+- 第二镜及以后：基于「上一张图」进行修改，描述「在该新场景/时刻中角色在做什么、表情与动作」，严格保持同一人物的发型、发色、服装特征、五官风格，像同一个人连续出现。若中途换装或换发型，后续镜头需保持与前一镜一致。
+
+场景与风格：
+- 场景可自由切换（卧室→窗边→厨房→户外→…），不要求场景一致，按时间线推进即可。
+- 画风统一：全部为日系二次元动画风格；光线与色调随剧情时间（清晨/午后/傍晚/夜晚）自然变化。
+- 可有2～3个无人物镜头：如窗外云卷云舒、闹钟特写、夕阳空镜等，用于氛围与转场，风格与整体一致。
+
+输出字段（共24个，只输出该镜头的描述文本，不要加字段名或前缀）：
+- shot1_image_prompt ～ shot12_image_prompt：每镜的单张画面描述，直接用于图生图。有角色时强调「在上一张图/参考图基础上保持人物一致并改为…」；无人物镜只描述场景与氛围。
+- shot1_video_prompt ～ shot12_video_prompt：每镜的短视频动效/运镜描述。其中 shot4、shot7、shot10 对应「场景切换」镜头，必须强调转场与运镜（如镜头从上一场景拉远/推近到新场景、淡入淡出、光线过渡、空间切换等）；其余为单镜头内的动作与轻微运镜。`,
+          customOutputs: [
+            { id: 'shot1_image_prompt', label: '分镜1 画面', description: '第1镜图生图提示' },
+            { id: 'shot1_video_prompt', label: '分镜1 运镜', description: '第1镜视频运镜' },
+            { id: 'shot2_image_prompt', label: '分镜2 画面', description: '第2镜图生图提示' },
+            { id: 'shot2_video_prompt', label: '分镜2 运镜', description: '第2镜视频运镜' },
+            { id: 'shot3_image_prompt', label: '分镜3 画面', description: '第3镜图生图提示' },
+            { id: 'shot3_video_prompt', label: '分镜3 运镜', description: '第3镜视频运镜' },
+            { id: 'shot4_image_prompt', label: '分镜4 画面', description: '第4镜图生图提示（场景切换）' },
+            { id: 'shot4_video_prompt', label: '分镜4 运镜', description: '第4镜转场运镜，强调转场' },
+            { id: 'shot5_image_prompt', label: '分镜5 画面', description: '第5镜图生图提示' },
+            { id: 'shot5_video_prompt', label: '分镜5 运镜', description: '第5镜视频运镜' },
+            { id: 'shot6_image_prompt', label: '分镜6 画面', description: '第6镜图生图提示' },
+            { id: 'shot6_video_prompt', label: '分镜6 运镜', description: '第6镜视频运镜' },
+            { id: 'shot7_image_prompt', label: '分镜7 画面', description: '第7镜图生图提示（场景切换）' },
+            { id: 'shot7_video_prompt', label: '分镜7 运镜', description: '第7镜转场运镜，强调转场' },
+            { id: 'shot8_image_prompt', label: '分镜8 画面', description: '第8镜图生图提示' },
+            { id: 'shot8_video_prompt', label: '分镜8 运镜', description: '第8镜视频运镜' },
+            { id: 'shot9_image_prompt', label: '分镜9 画面', description: '第9镜图生图提示' },
+            { id: 'shot9_video_prompt', label: '分镜9 运镜', description: '第9镜视频运镜' },
+            { id: 'shot10_image_prompt', label: '分镜10 画面', description: '第10镜图生图提示（场景切换）' },
+            { id: 'shot10_video_prompt', label: '分镜10 运镜', description: '第10镜转场运镜，强调转场' },
+            { id: 'shot11_image_prompt', label: '分镜11 画面', description: '第11镜图生图提示' },
+            { id: 'shot11_video_prompt', label: '分镜11 运镜', description: '第11镜视频运镜' },
+            { id: 'shot12_image_prompt', label: '分镜12 画面', description: '第12镜图生图提示' },
+            { id: 'shot12_video_prompt', label: '分镜12 运镜', description: '第12镜视频运镜' }
+          ]
+        }
+      },
+      { id: 'anim-i2i-1', toolId: 'image-to-image', x: 900, y: 80, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'anim-i2i-2', toolId: 'image-to-image', x: 900, y: 240, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'anim-i2i-3', toolId: 'image-to-image', x: 900, y: 400, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'anim-i2i-4', toolId: 'image-to-image', x: 900, y: 560, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'anim-i2i-5', toolId: 'image-to-image', x: 900, y: 720, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'anim-i2i-6', toolId: 'image-to-image', x: 900, y: 880, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'anim-i2i-7', toolId: 'image-to-image', x: 900, y: 1040, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'anim-i2i-8', toolId: 'image-to-image', x: 900, y: 1200, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'anim-i2i-9', toolId: 'image-to-image', x: 900, y: 1360, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'anim-i2i-10', toolId: 'image-to-image', x: 900, y: 1520, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'anim-i2i-11', toolId: 'image-to-image', x: 900, y: 1680, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'anim-i2i-12', toolId: 'image-to-image', x: 900, y: 1840, status: NodeStatus.IDLE, data: { model: 'Qwen-Image-Edit-2511', aspectRatio: '9:16' } },
+      { id: 'anim-v-1', toolId: 'video-gen-image', x: 1500, y: 80, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'anim-v-2', toolId: 'video-gen-image', x: 1500, y: 240, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'anim-v-3', toolId: 'video-gen-image', x: 1500, y: 400, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'anim-v-4', toolId: 'video-gen-dual-frame', x: 1500, y: 560, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'anim-v-5', toolId: 'video-gen-image', x: 1500, y: 720, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'anim-v-6', toolId: 'video-gen-image', x: 1500, y: 880, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'anim-v-7', toolId: 'video-gen-dual-frame', x: 1500, y: 1040, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'anim-v-8', toolId: 'video-gen-image', x: 1500, y: 1200, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'anim-v-9', toolId: 'video-gen-image', x: 1500, y: 1360, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'anim-v-10', toolId: 'video-gen-dual-frame', x: 1500, y: 1520, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'anim-v-11', toolId: 'video-gen-image', x: 1500, y: 1680, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } },
+      { id: 'anim-v-12', toolId: 'video-gen-image', x: 1500, y: 1840, status: NodeStatus.IDLE, data: { model: 'Wan2.2_I2V_A14B_distilled', aspectRatio: '9:16' } }
+    ]
+  },
   {
     id: 'preset-knowledge-ip',
     name: '知识IP口播工作流',

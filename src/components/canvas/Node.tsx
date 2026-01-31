@@ -26,7 +26,7 @@ import { useTranslation, Language } from '../../i18n/useTranslation';
 import { getIcon } from '../../utils/icons';
 import { formatTime } from '../../utils/format';
 import { screenToWorld, ViewState } from '../../utils/canvas';
-import { getAssetPath } from '../../utils/assetPath';
+import { getAssetPath, getResultRefPreviewUrl } from '../../utils/assetPath';
 import { uploadNodeInputFile, getLocalFileDataUrl } from '../../utils/workflowFileManager';
 import { isStandalone } from '../../config/runtimeMode';
 import { isLightX2VResultRef, type LightX2VResultRef } from '../../hooks/useWorkflowExecution';
@@ -171,7 +171,8 @@ export const Node: React.FC<NodeProps> = ({
       }
     }
   }, [node.id, onNodeHeightChange, node.data, outputs.length, activeOutputs[node.id], node.status]);
-  const nodeResultRaw = sourceOutputs[node.id] || (tool.category === 'Input' ? node.data.value : null);
+  // Prefer sourceOutputs (activeOutputs / run), then node.outputValue so saved refs show after load/refresh
+  const nodeResultRaw = sourceOutputs[node.id] ?? node.outputValue ?? (tool.category === 'Input' ? node.data.value : null);
   // Extract actual value from reference/optimized objects (for history or 纯前端 run.outputs)
   const nodeResult =
     nodeResultRaw && typeof nodeResultRaw === 'object' && !Array.isArray(nodeResultRaw)
@@ -181,26 +182,28 @@ export const Node: React.FC<NodeProps> = ({
         ? nodeResultRaw.data
         : nodeResultRaw.type === 'data_url' && typeof nodeResultRaw._full_data === 'string'
         ? nodeResultRaw._full_data
+        : nodeResultRaw.type === 'json' && nodeResultRaw.data != null
+        ? nodeResultRaw.data
         : nodeResultRaw
       : nodeResultRaw;
   const firstOutputType = outputs[0]?.type || DataType.TEXT;
   const previewValue = Array.isArray(nodeResult) ? (nodeResult.length > 0 ? nodeResult[0] : null) : (nodeResult ?? null);
   const isPreviewRef = previewValue != null && isLightX2VResultRef(previewValue);
+  const previewRefObj = isPreviewRef && typeof previewValue === 'object' ? (previewValue as LightX2VResultRef) : null;
   const [resolvedPreviewUrl, setResolvedPreviewUrl] = React.useState<string | null>(null);
   React.useEffect(() => {
-    if (!isPreviewRef || !resolveLightX2VResultRef || typeof previewValue !== 'object') {
-      if (!isPreviewRef) setResolvedPreviewUrl(null);
-      return;
-    }
+    if (!previewRefObj || !resolveLightX2VResultRef) return;
     let cancelled = false;
-    resolveLightX2VResultRef(previewValue as LightX2VResultRef)
-      .then((url) => { if (!cancelled) setResolvedPreviewUrl(url); })
-      .catch(() => { if (!cancelled) setResolvedPreviewUrl(null); });
-    return () => { cancelled = true; };
-  }, [node.id, isPreviewRef, resolveLightX2VResultRef, isPreviewRef && previewValue && typeof previewValue === 'object' ? (previewValue as LightX2VResultRef).task_id + (previewValue as LightX2VResultRef).output_name : '']);
-  React.useEffect(() => {
-    if (!isPreviewRef) setResolvedPreviewUrl(null);
-  }, [isPreviewRef]);
+    resolveLightX2VResultRef(previewRefObj).then((url) => {
+      if (!cancelled) setResolvedPreviewUrl(url);
+    }).catch(() => {
+      if (!cancelled) setResolvedPreviewUrl(null);
+    });
+    return () => { cancelled = true; setResolvedPreviewUrl(null); };
+  }, [previewRefObj?.task_id, previewRefObj?.output_name, previewRefObj?.is_cloud, resolveLightX2VResultRef]);
+  const refPreviewUrl = isPreviewRef && previewRefObj
+    ? (resolveLightX2VResultRef ? resolvedPreviewUrl : getResultRefPreviewUrl(previewRefObj))
+    : null;
   const [resolvedLocalUrls, setResolvedLocalUrls] = React.useState<Record<string, string>>({});
   React.useEffect(() => {
     const values = Array.isArray(node.data.value) ? node.data.value : (node.data.value ? [node.data.value] : []);
@@ -535,6 +538,15 @@ export const Node: React.FC<NodeProps> = ({
     String(node.data.model).trim() !== '' &&
     !tool.models.some((m) => m.id === node.data.model);
 
+  const modelsListEmpty = Array.isArray(tool.models) && tool.models.length === 0;
+
+  // 当前模型不在支持列表中时，自动选为列表第一项
+  React.useEffect(() => {
+    if (!modelNotInList || !tool.models?.length) return;
+    const firstId = tool.models[0]?.id;
+    if (firstId != null) onUpdateNodeData(node.id, 'model', firstId);
+  }, [modelNotInList, tool.models, node.id, onUpdateNodeData]);
+
   return (
     <div
       ref={nodeRef}
@@ -550,14 +562,14 @@ export const Node: React.FC<NodeProps> = ({
       onClick={handleNodeClick}
       onMouseDown={handleNodeMouseDown}
     >
-      {/* 当前模型不在该节点支持列表中时，节点上方显示警告 */}
-      {modelNotInList && (
+      {/* 模型列表为空时显示警告；模型不在列表中时已由 effect 自动切到第一项 */}
+      {modelsListEmpty && (
         <div
           className="absolute bottom-full left-0 right-0 mb-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/50 text-amber-200 text-[9px] font-bold z-20"
-          title={t('model_needs_update')}
+          title={t('model_list_empty')}
         >
           <TriangleAlert size={10} className="shrink-0" />
-          <span className="truncate">{t('model_needs_update')}</span>
+          <span className="truncate">{t('model_list_empty')}</span>
         </div>
       )}
       {/* Replace and Delete Menu */}
@@ -1041,9 +1053,9 @@ export const Node: React.FC<NodeProps> = ({
         >
           {firstOutputType === DataType.IMAGE ? (
             isPreviewRef ? (
-              resolvedPreviewUrl ? (
+              refPreviewUrl ? (
                 <img
-                  src={resolvedPreviewUrl}
+                  src={refPreviewUrl}
                   className="max-w-full max-h-full w-auto h-auto object-contain"
                   alt="Preview"
                 />
@@ -1087,10 +1099,10 @@ export const Node: React.FC<NodeProps> = ({
           ) : (
             <div className="w-full h-full relative bg-black group/video min-w-32 min-h-24 flex items-center justify-center">
               {isPreviewRef ? (
-                resolvedPreviewUrl ? (
+                refPreviewUrl ? (
                   <>
                     <video
-                      src={resolvedPreviewUrl}
+                      src={refPreviewUrl}
                       className="max-w-full max-h-full w-auto h-auto object-contain opacity-60 group-hover/thumb:opacity-100 transition-opacity"
                       muted
                       preload="none"

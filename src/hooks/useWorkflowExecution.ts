@@ -7,14 +7,14 @@ import {
   deepseekText, doubaoText, ppchatGeminiText,
   getLightX2VConfigForModel,
   lightX2VCancelTask,
-  lightX2VTaskQuery,
-  lightX2VResultUrl
+  lightX2VTaskQuery
 } from '../../services/geminiService';
 import { isStandalone } from '../config/runtimeMode';
 import { removeGeminiWatermark } from '../../services/watermarkRemover';
 import { useTranslation, Language } from '../i18n/useTranslation';
 import { saveNodeOutputData, getNodeOutputData, getWorkflowFileByFileId } from '../utils/workflowFileManager';
 import { apiRequest } from '../utils/apiClient';
+import { resolveLightX2VResultRef as resolveLightX2VResultRefUtil } from '../utils/resultRef';
 import { workflowSaveQueue } from '../utils/workflowSaveQueue';
 import { workflowOfflineQueue } from '../utils/workflowOfflineQueue';
 import { checkWorkflowOwnership, getCurrentUserId } from '../utils/workflowUtils';
@@ -23,22 +23,13 @@ import { getAssetPath, getAssetBasePath } from '../utils/assetPath';
 /** LightX2V 结果引用：用 task_id + output_name 代替过期 CDN URL，需要时通过 result_url 解析 */
 export type LightX2VResultRef = { __type: 'lightx2v_result'; task_id: string; output_name: string; is_cloud: boolean };
 export function isLightX2VResultRef(val: any): val is LightX2VResultRef {
-  return val && typeof val === 'object' && val.__type === 'lightx2v_result' && typeof val.task_id === 'string' && typeof val.output_name === 'string';
+  return val != null && typeof val === 'object' && !Array.isArray(val) &&
+    (val as any).__type === 'lightx2v_result' &&
+    typeof (val as any).task_id === 'string' &&
+    typeof (val as any).output_name === 'string';
 }
 function toLightX2VResultRef(task_id: string, output_name: string, is_cloud: boolean): LightX2VResultRef {
   return { __type: 'lightx2v_result', task_id, output_name, is_cloud };
-}
-
-/** 缓存 result_url 解析结果，避免同一 ref 反复请求（presigned URL 有效期较长，缓存 1 小时） */
-const LIGHTX2V_RESULT_URL_CACHE_TTL_MS = 60 * 60 * 1000;
-const lightX2VResultUrlCache = new Map<string, { url: string; ts: number }>();
-function getCachedResultUrl(cacheKey: string): string | null {
-  const entry = lightX2VResultUrlCache.get(cacheKey);
-  if (!entry || Date.now() - entry.ts > LIGHTX2V_RESULT_URL_CACHE_TTL_MS) return null;
-  return entry.url;
-}
-function setCachedResultUrl(cacheKey: string, url: string): void {
-  lightX2VResultUrlCache.set(cacheKey, { url, ts: Date.now() });
 }
 
 /** 将多路 in-image 输入扁平为一维图片列表（多连接或多图时每路可能是数组，需合并） */
@@ -230,26 +221,9 @@ function useWorkflowExecutionImpl({
     setPendingRunNodeIds([...new Set([...fromQueue, ...fromRunning])]);
   }, []);
 
-  /** Resolve LightX2V result ref to a fresh URL via result_url (backend or cloud). Uses cache to avoid repeated calls. */
-  const resolveLightX2VResultRef = useCallback(async (ref: LightX2VResultRef): Promise<string> => {
-    const cacheKey = `${ref.is_cloud}:${ref.task_id}:${ref.output_name}`;
-    const cached = getCachedResultUrl(cacheKey);
-    if (cached != null) return cached;
-
-    let url: string;
-    if (ref.is_cloud) {
-      const cloudUrl = (process.env.LIGHTX2V_CLOUD_URL || 'https://x2v.light-ai.top').trim();
-      const cloudToken = (process.env.LIGHTX2V_CLOUD_TOKEN || '').trim();
-      url = await lightX2VResultUrl(cloudUrl, cloudToken, ref.task_id, ref.output_name);
-    } else {
-      const res = await apiRequest(`/api/v1/task/result_url?task_id=${encodeURIComponent(ref.task_id)}&name=${encodeURIComponent(ref.output_name)}`, { method: 'GET' });
-      if (!res.ok) throw new Error(`result_url failed: ${res.status}`);
-      const data = await res.json().catch(() => ({})) as { url?: string };
-      if (!data.url) throw new Error('result_url missing url');
-      url = data.url;
-    }
-    setCachedResultUrl(cacheKey, url);
-    return url;
+  /** Resolve LightX2V result ref to a fresh URL via result_url (backend or cloud). Uses cache and proxy when standalone. */
+  const resolveLightX2VResultRef = useCallback((ref: LightX2VResultRef): Promise<string> => {
+    return resolveLightX2VResultRefUtil(ref);
   }, []);
 
   /** Runs one job (full or single node). Called by processQueue. Does not set isRunning false (processQueue does when queue empty). */
@@ -1194,7 +1168,8 @@ function useWorkflowExecutionImpl({
 
             // Use node.outputValue if available (more reliable), otherwise fall back to sessionOutputs
             const outputToSave = node.outputValue !== undefined ? node.outputValue : output;
-            console.log(`[WorkflowExecution] Node ${nodeId} (${node.toolId}) outputToSave type:`, typeof outputToSave, outputToSave ? (typeof outputToSave === 'string' ? (outputToSave.length > 100 ? outputToSave.substring(0, 100) + '...' : outputToSave) : 'object/array') : 'empty');
+            const isRef = isLightX2VResultRef(outputToSave);
+            console.log(`[WorkflowExecution] Node ${nodeId} (${node.toolId}) outputToSave:`, isRef ? 'LightX2VResultRef' : typeof outputToSave, isRef ? (outputToSave as LightX2VResultRef).task_id : (outputToSave && typeof outputToSave === 'object' ? 'object' : outputToSave ? 'string' : 'empty'));
 
             // Check if outputToSave is empty or invalid
             if (!outputToSave || (typeof outputToSave === 'string' && outputToSave.length === 0)) {
@@ -1202,9 +1177,28 @@ function useWorkflowExecutionImpl({
               continue;
             }
 
-            // Handle different output formats - save ALL types of outputs (data URLs, text, JSON, task result URLs)
-            if (outputToSave && typeof outputToSave === 'object' && !Array.isArray(outputToSave)) {
-              // Multi-output node (outputValue is a Record<portId, value>)
+            // Handle different output formats - save ALL types of outputs (data URLs, text, JSON, task result refs)
+            // LightX2VResultRef must be treated as single object so task_id is persisted; do NOT treat as multi-output
+            if (isLightX2VResultRef(outputToSave)) {
+              const firstOutputPort = tool.outputs[0];
+              if (firstOutputPort) {
+                console.log(`[WorkflowExecution] Saving single-output node ${nodeId}/${firstOutputPort.id} (LightX2VResultRef):`, outputToSave.task_id);
+                saveMeta.push({ nodeId, portId: firstOutputPort.id, value: outputToSave, kind: 'single' });
+                savePromises.push(
+                  saveNodeOutputData(workflow.id, nodeId, firstOutputPort.id, outputToSave, runId)
+                    .then(result => {
+                      if (result) console.log(`[WorkflowExecution] ✓ Saved node output data (ref) for ${nodeId}/${firstOutputPort.id}:`, result);
+                      else console.warn(`[WorkflowExecution] ✗ Save returned null for ${nodeId}/${firstOutputPort.id}`);
+                      return result;
+                    })
+                    .catch(err => {
+                      console.error(`[WorkflowExecution] ✗ Error saving node output data for ${nodeId}/${firstOutputPort.id}:`, err);
+                      throw err;
+                    })
+                );
+              }
+            } else if (outputToSave && typeof outputToSave === 'object' && !Array.isArray(outputToSave)) {
+              // Multi-output node (outputValue is a Record<portId, value>), not a LightX2VResultRef
               for (const [portId, value] of Object.entries(outputToSave)) {
                 // Save all types: data URLs, text, JSON, task result URLs
                 if ((typeof value === 'string' && value.length > 0) || (typeof value === 'object' && value !== null && !Array.isArray(value))) {
@@ -1333,7 +1327,8 @@ function useWorkflowExecutionImpl({
               if (!meta) return;
               const saveResult = result.value;
               const fileUrl = saveResult.file_url || saveResult.url;
-              const shouldReplaceWithUrl = fileUrl && isDataUrl(meta.value);
+              // Never replace LightX2VResultRef with URL so task_id stays in node.outputValue for result_url resolution
+              const shouldReplaceWithUrl = fileUrl && isDataUrl(meta.value) && !isLightX2VResultRef(meta.value);
 
               if (meta.kind === 'multi') {
                 if (!updatedOutputs[meta.nodeId] || typeof updatedOutputs[meta.nodeId] !== 'object') {

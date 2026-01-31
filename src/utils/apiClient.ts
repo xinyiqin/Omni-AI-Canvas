@@ -7,7 +7,7 @@ import { isStandalone } from '../config/runtimeMode';
  * - 若未设置 LIGHTX2V_URL：用用户登录的 accessToken 或环境变量 LIGHTX2V_TOKEN
  */
 export function initLightX2VToken(): void {
-  const envUrl = (process.env.LIGHTX2V_URL || '').trim();
+  const envUrl = (process.env.BASE_URL || '').trim();
   const envToken = (process.env.LIGHTX2V_TOKEN || '').trim();
   const accessToken = localStorage.getItem('accessToken');
 
@@ -123,15 +123,20 @@ export function getApiBaseUrl(): string {
   // 回退到当前域名
   return typeof window !== 'undefined'
     ? `${window.location.protocol}//${window.location.host}`
-    : 'http://localhost:8082';
+    : 'http://localhost:8081';
 }
 
 /**
  * 获取访问令牌
- * - 本地后端或 Cloud：优先用户登录的 accessToken，否则环境变量 LIGHTX2V_TOKEN，否则空字符串
+ * - 本地后端或 Cloud：优先 sharedStore（qiankun 主应用），否则 localStorage，否则环境变量 LIGHTX2V_TOKEN
  */
 let tokenCache: { token: string; timestamp: number } | null = null;
 const TOKEN_CACHE_TTL = 1000;
+
+/** 清除 token 缓存，用于 qiankun mount 后强制重新从 sharedStore/localStorage 读取 */
+export function clearTokenCache(): void {
+  tokenCache = null;
+}
 
 export function getAccessToken(): string {
   const now = Date.now();
@@ -139,12 +144,14 @@ export function getAccessToken(): string {
     return tokenCache.token;
   }
 
-  const localToken = localStorage.getItem('accessToken');
+  const sharedStore = getSharedStore();
+  const storeToken = sharedStore ? sharedStore.getState('token') : null;
+  const localToken = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
   const envToken = (process.env.LIGHTX2V_TOKEN || '').trim();
 
-  const token = (localToken || envToken) || '';
-  if (localToken) {
-    (process.env as any).LIGHTX2V_TOKEN = localToken;
+  const token = (storeToken || localToken || envToken) || '';
+  if (storeToken || localToken) {
+    (process.env as any).LIGHTX2V_TOKEN = token;
   }
   tokenCache = { token, timestamp: now };
   return token;

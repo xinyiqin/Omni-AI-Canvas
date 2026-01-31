@@ -77,6 +77,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     visibility_private: 'Private',
     visibility_public: 'Public',
     model_needs_update: 'Model not in list — please update manually',
+    model_list_empty: 'Model list is empty — check environment or API config',
     chat_mode_edit: 'Workflow Edit',
     chat_mode_ideation: 'Ideation',
     generate_workflow_directly: 'Generate workflow directly'
@@ -157,6 +158,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     visibility_private: '私有',
     visibility_public: '公开',
     model_needs_update: '当前模型不在支持列表中，请手动更新',
+    model_list_empty: '该节点模型列表为空，请检查环境或 API 配置',
     text_input_placeholder: '在此输入文本...',
     chars_count: '字符',
     global_ai_behavior_placeholder: '设置全局 AI 行为...',

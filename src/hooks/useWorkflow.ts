@@ -429,6 +429,10 @@ export const useWorkflow = () => {
             if (value.type === 'reference' || value.data_id) {
               return value;
             }
+            // Preserve LightX2VResultRef (task_id + output_name) so saved workflow can resolve result_url
+            if (value.__type === 'lightx2v_result' && typeof value.task_id === 'string' && typeof value.output_name === 'string') {
+              return value;
+            }
             const cleaned: Record<string, any> = {};
             Object.entries(value).forEach(([key, val]) => {
               const nextVal = stripBase64FromOutput(val);

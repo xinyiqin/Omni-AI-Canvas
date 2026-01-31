@@ -41,6 +41,7 @@ import { useWorkflowAutoSave } from './src/hooks/useWorkflowAutoSave';
 import { getAccessToken, initLightX2VToken, apiRequest } from './src/utils/apiClient';
 import { checkWorkflowOwnership, getCurrentUserId } from './src/utils/workflowUtils';
 import { isStandalone } from './src/config/runtimeMode';
+import { collectLightX2VResultRefs } from './src/utils/resultRef';
 
 // --- Main App ---
 
@@ -387,6 +388,13 @@ const App: React.FC = () => {
   const validateWorkflow = workflowExecution.validateWorkflow;
   const getDescendants = workflowExecution.getDescendants;
   const resolveLightX2VResultRef = workflowExecution.resolveLightX2VResultRef;
+
+  // Pre-resolve lightx2v result refs when entering workflow editor (warm cache for node previews)
+  useEffect(() => {
+    if (currentView !== 'EDITOR' || !workflow || !resolveLightX2VResultRef) return;
+    const refs = workflow.nodes.flatMap((n) => collectLightX2VResultRefs(n.outputValue));
+    refs.forEach((ref) => resolveLightX2VResultRef(ref).catch(() => {}));
+  }, [currentView, workflow?.id, workflow?.nodes, resolveLightX2VResultRef]);
 
   // Helper functions for voice selection
   const getLanguageDisplayName = useCallback((langCode: string) => {
@@ -1336,7 +1344,16 @@ const App: React.FC = () => {
   }, [workflow, selectedRunId]);
 
   const sourceOutputs = React.useMemo(() => {
-    if (!workflow || !selectedRunId) return activeOutputs;
+    if (!workflow) return activeOutputs;
+    // When no run selected: merge node.outputValue so preview works after load/refresh (e.g. LightX2VResultRef)
+    if (!selectedRunId) {
+      const fromNodes = Object.fromEntries(
+        workflow.nodes
+          .filter((n) => n.outputValue !== undefined && n.outputValue !== null)
+          .map((n) => [n.id, n.outputValue])
+      );
+      return { ...fromNodes, ...activeOutputs };
+    }
     const run = workflow.history.find(r => r.id === selectedRunId);
     const outputs = run?.outputs || {};
     const normalize = (v: any): any => {

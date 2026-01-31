@@ -124,7 +124,7 @@ export const useResultManagement = ({
       for (const node of nodes) {
         if (node.status !== NodeStatus.RUNNING && node.status !== NodeStatus.SUCCESS && node.status !== NodeStatus.ERROR) continue;
         if (!workflow.showIntermediateResults && !isTerminal(node) && node.status !== NodeStatus.ERROR) continue;
-        const raw = activeOutputs[node.id];
+        const raw = activeOutputs[node.id] ?? node.outputValue;
         const tool = TOOLS.find(t => t.id === node.toolId);
         const output = raw != null ? normalizeOutputForDisplay(raw) : (tool?.category === 'Input' ? node.data?.value : undefined);
         entries.unshift({ runId: 'current', runTimestamp: now, nodeId: node.id, node, output: output ?? null });
